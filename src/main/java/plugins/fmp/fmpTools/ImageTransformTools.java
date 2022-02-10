@@ -36,45 +36,47 @@ public class ImageTransformTools {
 		IcyBufferedImage transformedImage = null;
 		
 		switch (transformop) {
-		case NONE: 
-		case COLORARRAY1: /*System.out.println("transform image - " + transformop);*/
-			transformedImage = inputImage;
-			break;
-		
-		case R_RGB: 	transformedImage= functionRGB_keepOneChan(inputImage, 0); break;
-		case G_RGB: 	transformedImage= functionRGB_keepOneChan(inputImage, 1); break;
-		case B_RGB: 	transformedImage= functionRGB_keepOneChan(inputImage, 2); break;
-		case RGB: 		transformedImage= functionRGB_grey (inputImage);
-		
-		case H_HSB: 	transformedImage= functionRGBtoHSB(inputImage, 0); break;
-		case S_HSB: 	transformedImage= functionRGBtoHSB(inputImage, 1); break;
-		case B_HSB: 	transformedImage= functionRGBtoHSB(inputImage, 2); break;
-
-		case R2MINUS_GB: transformedImage= functionRGB_2C3MinusC1C2 (inputImage, 1, 2, 0); break;
-		case G2MINUS_RB: transformedImage= functionRGB_2C3MinusC1C2 (inputImage, 0, 2, 1); break;
-		case B2MINUS_RG: transformedImage= functionRGB_2C3MinusC1C2 (inputImage, 0, 1, 2); break;
-		case GBMINUS_2R: transformedImage= functionRGB_C1C2minus2C3 (inputImage, 1, 2, 0); break;
-		case RBMINUS_2G: transformedImage= functionRGB_C1C2minus2C3 (inputImage, 0, 2, 1); break;
-		case RGMINUS_2B: transformedImage= functionRGB_C1C2minus2C3 (inputImage, 0, 1, 2); break;
-
-		case NORM_BRMINUSG: transformedImage= functionNormRGB_sumC1C2Minus2C3(inputImage, 1, 2, 0); break;
-		case RTOGB: 	transformedImage= functionTransferRedToGreenAndBlue(inputImage); break;
+			case NONE: 
+			case COLORARRAY1: /*System.out.println("transform image - " + transformop);*/
+				transformedImage = inputImage;
+				break;
 			
-		case REF_T0: 	transformedImage= functionSubtractRef(inputImage); break;
-		case REF: 		transformedImage= functionSubtractRef(inputImage); break;
-		case REF_PREVIOUS: 
-			int t = vinputSequence.currentFrame;
-			if (t>0){
-				referenceImage = vinputSequence.loadVImage(t-1); 
-				transformedImage= functionSubtractRef(inputImage);} 
-			break;
+			case R_RGB: 	transformedImage= functionRGB_keepOneChan(inputImage, 0); break;
+			case G_RGB: 	transformedImage= functionRGB_keepOneChan(inputImage, 1); break;
+			case B_RGB: 	transformedImage= functionRGB_keepOneChan(inputImage, 2); break;
+			case RGB: 		transformedImage= functionRGB_grey (inputImage);
 			
-		case XDIFFN: 	transformedImage= computeXDiffn (inputImage); break;
-		case YDIFFN: 	transformedImage= computeYDiffn (inputImage); break;		
-		case XYDIFFN: 	transformedImage= computeXYDiffn (inputImage); break;
-
-		case RGB_TO_HSV: transformedImage= functionRGBtoHSV(inputImage); break;
-		case RGB_TO_H1H2H3: transformedImage= functionRGBtoH1H2H3(inputImage); break;
+			case H_HSB: 	transformedImage= functionRGBtoHSB(inputImage, 0); break;
+			case S_HSB: 	transformedImage= functionRGBtoHSB(inputImage, 1); break;
+			case B_HSB: 	transformedImage= functionRGBtoHSB(inputImage, 2); break;
+	
+			case R2MINUS_GB: transformedImage= functionRGB_2C3MinusC1C2 (inputImage, 1, 2, 0); break;
+			case G2MINUS_RB: transformedImage= functionRGB_2C3MinusC1C2 (inputImage, 0, 2, 1); break;
+			case B2MINUS_RG: transformedImage= functionRGB_2C3MinusC1C2 (inputImage, 0, 1, 2); break;
+			case GBMINUS_2R: transformedImage= functionRGB_C1C2minus2C3 (inputImage, 1, 2, 0); break;
+			case RBMINUS_2G: transformedImage= functionRGB_C1C2minus2C3 (inputImage, 0, 2, 1); break;
+			case RGMINUS_2B: transformedImage= functionRGB_C1C2minus2C3 (inputImage, 0, 1, 2); break;
+	
+			case NORM_BRMINUSG: transformedImage= functionNormRGB_sumC1C2Minus2C3(inputImage, 1, 2, 0); break;
+			case RTOGB: 	transformedImage= functionTransferRedToGreenAndBlue(inputImage); break;
+				
+			case REF_T0: 	transformedImage= functionSubtractRef(inputImage); break;
+			case REF: 		transformedImage= functionSubtractRef(inputImage); break;
+			case REF_PREVIOUS: 
+				int t = vinputSequence.currentFrame;
+				if (t>0)
+				{
+					referenceImage = vinputSequence.loadVImage(t-1); 
+					transformedImage= functionSubtractRef(inputImage);
+				} 
+				break;
+				
+			case XDIFFN: 	transformedImage= computeXDiffn (inputImage); break;
+			case YDIFFN: 	transformedImage= computeYDiffn (inputImage); break;		
+			case XYDIFFN: 	transformedImage= computeXYDiffn (inputImage); break;
+	
+			case RGB_TO_HSV: transformedImage= functionRGBtoHSV(inputImage); break;
+			case RGB_TO_H1H2H3: transformedImage= functionRGBtoH1H2H3(inputImage); break;
 		}
 		
 		return transformedImage;
@@ -84,7 +86,6 @@ public class ImageTransformTools {
 		return transformImage(vinputSequence.loadVImage(t), transformop);
 	}
 		
-	// function proposed by François Rebaudo
 	private IcyBufferedImage functionNormRGB_sumC1C2Minus2C3 (IcyBufferedImage sourceImage, int Rlayer, int Glayer, int Blayer) {
  
 		double[] Rn = Array1DUtil.arrayToDoubleArray(sourceImage.getDataXY(Rlayer), sourceImage.isSignedDataType());

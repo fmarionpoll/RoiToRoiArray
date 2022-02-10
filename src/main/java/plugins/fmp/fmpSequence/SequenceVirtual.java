@@ -21,7 +21,6 @@ import icy.main.Icy;
 import icy.math.ArrayMath;
 import icy.sequence.MetaDataUtil;
 import icy.sequence.Sequence;
-import icy.system.thread.ThreadUtil;
 import icy.type.collection.array.Array1DUtil;
 
 import ome.xml.meta.OMEXMLMetadata;
@@ -48,12 +47,11 @@ public class SequenceVirtual extends Sequence
 	public int 				currentFrame 	= 0;
 	public int				nTotalFrames 	= 0;
 	
-	public VImageBufferThread bufferThread 	= null;
 	public boolean			bBufferON 		= false;
 	public EnumStatus 		status			= EnumStatus.REGULAR;
 	
-	public Capillaries 		capillaries 	= new Capillaries();
-	public Cages			cages 			= new Cages();
+	public Capillaries 		capillariesRoi2RoiArray 	= new Capillaries();
+	public Cages			cagesRoi2RoiArray 			= new Cages();
 	
 	public String [] 		seriesname 		= null;
 	public int [][] 		data_raw 		= null;
@@ -66,47 +64,58 @@ public class SequenceVirtual extends Sequence
 	public ImageOperationsStruct 	cacheThresholdOp = new ImageOperationsStruct();
 	
 	// ----------------------------------------
-	public SequenceVirtual () {
+	public SequenceVirtual () 
+	{
 		status = EnumStatus.REGULAR;
 	}
 	
 	
-	public SequenceVirtual(String name, IcyBufferedImage image) {
+	public SequenceVirtual(String name, IcyBufferedImage image) 
+	{
 		super (name, image);
 	}
 	
-	public SequenceVirtual (Sequence seq) {
+	public SequenceVirtual (Sequence seq) 
+	{
 		int nfiles = seq.getSizeT();
 		String fileList[] = new String[nfiles];
 		String directory = null;
-		for(int i=0; i < nfiles; i++) {
-			String firstfile = seq.getFilename (0, 0, 0);
+		for(int t=0; t < nfiles; t++) 
+		{
+			String firstfile = seq.getFilename (0, t, 0);
+			if (firstfile == null)
+				continue;
 			Path path = Paths.get(firstfile);
-			if (i == 0) 
+			if (t == 0) 
 				directory = path.getParent().toString();
 			String filename = path.getFileName().toString();
-			fileList[i] = filename;
+			fileList[t] = filename;
 		}
 		
 		loadSequenceVirtual(fileList, directory);
 		filename = directory + ".xml";		
 	}
 
-	public SequenceVirtual (String csFile) {
+	public SequenceVirtual (String csFile) 
+	{
 		loadSequenceVirtualAVI(csFile);
 	}
 
-	public SequenceVirtual (String [] list, String directory) {
+	public SequenceVirtual (String [] list, String directory) 
+	{
 		loadSequenceVirtual(list, directory);
 		filename = directory + ".xml";
 	}
 
-	public static boolean acceptedFileType(String name) {
+	public static boolean acceptedFileType(String name) 
+	{
 		/* 
 		 * Returns true if 'name' includes one of the accepted types stored in the "accepted" list 
 		 */
-		if (name==null) return false;
-		for (int i=0; i<acceptedTypes.length; i++) {
+		if (name==null) 
+			return false;
+		for (int i=0; i<acceptedTypes.length; i++) 
+		{
 			if (name.endsWith(acceptedTypes[i]))
 				return true;
 		}
@@ -114,8 +123,8 @@ public class SequenceVirtual extends Sequence
 	}	
 
 	@Override
-	public void close() {
-		vImageBufferThread_STOP();
+	public void close() 
+	{
 		super.close();
 	}
 	
@@ -149,12 +158,14 @@ public class SequenceVirtual extends Sequence
 		}
 	}
 
-	public String getDirectory () {
+	public String getDirectory () 
+	{
 		return directory;
 	}
 
 	@Override
-	public IcyBufferedImage getImage(int t, int z, int c) {
+	public IcyBufferedImage getImage(int t, int z, int c) 
+	{
 		setVImageName(t);
 		IcyBufferedImage image =  loadVImage(t, z);
 		if (image != null && c != -1)
@@ -163,26 +174,30 @@ public class SequenceVirtual extends Sequence
 	}
 
 	@Override
-	public IcyBufferedImage getImage(int t, int z) {
+	public IcyBufferedImage getImage(int t, int z) 
+	{
 		IcyBufferedImage image;
 		if (t == currentFrame) {
 			image = super.getImage(t, z);
 		}
-		else {
+		else 
+		{
 		  	image =  loadVImage(t, z);
 		}
 		setVImageName(t);
 		return image;
 	}
 	
-	public IcyBufferedImage getImageTransf(int t, int z, int c, EnumImageOp transformop) {
+	public IcyBufferedImage getImageTransf(int t, int z, int c, EnumImageOp transformop) 
+	{
 		IcyBufferedImage image =  loadVImageAndSubtractReference(t, transformop);
 		if (image != null && c != -1)
 			image = IcyBufferedImageUtil.extractChannel(image, c);
 		return image;
 	}
 	
-	public IcyBufferedImage loadVImageAndSubtractReference(int t, EnumImageOp transformop) {
+	public IcyBufferedImage loadVImageAndSubtractReference(int t, EnumImageOp transformop) 
+	{
 		IcyBufferedImage ibufImage = loadVImage(t);
 		switch (transformop) {
 			case REF_PREVIOUS: // subtract image n-analysisStep
@@ -208,7 +223,8 @@ public class SequenceVirtual extends Sequence
 		return ibufImage;
 	}
 		
-	public String[] getListofFiles() {
+	public String[] getListofFiles() 
+	{
 		return listFiles;
 	}
 
@@ -219,7 +235,8 @@ public class SequenceVirtual extends Sequence
 	 * the "current" virtual version of SequenceVirtual (as of 18-oct-2018) does not support volumetric images 
 	 */
 	@Override
-	public int getSizeT() {
+	public int getSizeT() 
+	{
 		int nframes = 0;
 		if (status == EnumStatus.REGULAR)
 			nframes = super.getSizeT();
@@ -228,18 +245,21 @@ public class SequenceVirtual extends Sequence
 		return nframes;
 	}
 
-	public int getT() {
+	public int getT() 
+	{
 		return currentFrame;
 	}
 
-	public double getVData(int t, int z, int c, int y, int x) {
+	public double getVData(int t, int z, int c, int y, int x) 
+	{
 		final IcyBufferedImage img = loadVImage(t);
 		if (img != null)
 			return img.getData(x, y, c);
 		return 0d;
 	}
 
-	public String getDecoratedImageName(int t) {
+	public String getDecoratedImageName(int t) 
+	{
 		String csTitle = "["+t+ "/" + nTotalFrames + " V] : ";
 		if (status == EnumStatus.FILESTACK) 
 			csTitle += listFiles[t];
@@ -248,7 +268,8 @@ public class SequenceVirtual extends Sequence
 		return csTitle;
 	}
 
-	public String getFileName(int t) {
+	public String getFileName(int t) 
+	{
 		String csName = null;
 		if (status == EnumStatus.FILESTACK) 
 			csName = listFiles[t];
@@ -257,11 +278,13 @@ public class SequenceVirtual extends Sequence
 		return csName;
 	}
 	
-	public boolean isFileStack() {
+	public boolean isFileStack() 
+	{
 		return (status == EnumStatus.FILESTACK);
 	}
 		
-	public IcyBufferedImage loadVImage(int t, int z) {
+	public IcyBufferedImage loadVImage(int t, int z) 
+	{
 		IcyBufferedImage ibufImage = super.getImage(t, z);
 		// not found : load from file
 		if (ibufImage == null) 
@@ -270,7 +293,8 @@ public class SequenceVirtual extends Sequence
 		return ibufImage;
 	}
 	
-	public IcyBufferedImage loadVImage(int t) {
+	public IcyBufferedImage loadVImage(int t) 
+	{
 		IcyBufferedImage ibufImage = super.getImage(t, 0);
 		// not found : load from file
 		if (ibufImage == null)
@@ -278,14 +302,14 @@ public class SequenceVirtual extends Sequence
 		return ibufImage;
 	}
 	
-	private IcyBufferedImage loadVImageFromFile(int t) {
+	private IcyBufferedImage loadVImageFromFile(int t) 
+	{
 		BufferedImage buf =null;
 		if (status == EnumStatus.FILESTACK) {
 			buf = ImageUtil.load(listFiles[t]);
 			ImageUtil.waitImageReady(buf);
 			if (buf == null)
-				return null;
-							
+				return null;		
 		}
 		else if (status == EnumStatus.AVIFILE) {
 			try {
@@ -303,7 +327,8 @@ public class SequenceVirtual extends Sequence
 		return IcyBufferedImage.createFrom(buf);
 	}
 	
-	public boolean setCurrentVImage(int t) {
+	public boolean setCurrentVImage(int t) 
+	{
 		BufferedImage bimage = loadVImage(t);
 		if (bimage == null)
 			return false;
@@ -315,7 +340,8 @@ public class SequenceVirtual extends Sequence
 	}
 
 	@Override
-	public void setImage(int t, int z, BufferedImage bimage) throws IllegalArgumentException {
+	public void setImage(int t, int z, BufferedImage bimage) throws IllegalArgumentException 
+	{
 		/* setImage overloaded
 		 * caveats: 
 		 * (1) this routine deals only with 2D images i.e. z is not used (z= 0), 
@@ -330,13 +356,15 @@ public class SequenceVirtual extends Sequence
 			super.setImage(t, z, bimage);
 	}
 
-	public void setVImage(int t) {
+	public void setVImage(int t) 
+	{
 		IcyBufferedImage ibuf = loadVImage(t);
 		if (ibuf != null)
 			super.setImage(t, 0, ibuf);
 	}
 
-	public String[] keepOnlyAcceptedNames(String[] rawlist) {
+	public String[] keepOnlyAcceptedNames(String[] rawlist) 
+	{
 		// -----------------------------------------------
 		// subroutines borrowed from FolderOpener
 		/* Keep only "accepted" names (file extension)*/
@@ -360,127 +388,6 @@ public class SequenceVirtual extends Sequence
 			}
 		}
 		return list;
-	}
-
-	public void vImageBufferThread_START (int numberOfImageForBuffer) {
-		vImageBufferThread_STOP();
-
-		bufferThread = new VImageBufferThread(this, numberOfImageForBuffer);
-		bufferThread.setName("Buffer Thread");
-		bufferThread.setPriority(Thread.NORM_PRIORITY);
-		bufferThread.start();
-	}
-	
-	public void vImageBufferThread_STOP() {
-		if (bufferThread != null)
-		{
-			bufferThread.interrupt();
-			try {
-				bufferThread.join();
-			}
-			catch (final InterruptedException e1) { e1.printStackTrace(); }
-		}
-		// TODO clean buffer by removing images?
-	}
-
-	public void cleanUpBufferAndRestart() {
-		if (bufferThread == null)
-			return;
-		int depth = bufferThread.getFenetre();
-		vImageBufferThread_STOP();
-		for (int t = 0; t < nTotalFrames-1 ; t++) {
-			removeImage(t, 0);
-		}
-		vImageBufferThread_START(depth);
-	}
-	
-	public class VImageBufferThread extends Thread {
-
-		/**
-		 * pre-fetch files / companion to SequenceVirtual
-		 */
-
-		private int fenetre = 20; // 100;
-		private int span = fenetre/2;
-
-		public VImageBufferThread() {
-			bBufferON = true;
-		}
-
-		public VImageBufferThread(SequenceVirtual vseq, int depth) {
-			fenetre = depth;
-			span = fenetre/2 * analysisStep;
-			bBufferON = true;
-		}
-		
-		public void setFenetre (int depth) {
-			fenetre = depth;
-			span = fenetre/2 * analysisStep;
-		}
-
-		public int getFenetre () {
-			return fenetre;
-		}
-		public int getStep() {
-			return analysisStep;
-		}
-
-		public int getCurrentBufferLoadPercent()
-		{
-			int currentBufferPercent = 0;
-			int frameStart = currentFrame-span; 
-			int frameEnd = currentFrame + span;
-			if (frameStart < 0) 
-				frameStart = 0;
-			if (frameEnd >= (int) nTotalFrames) 
-				frameEnd = (int) nTotalFrames-1;
-
-			float nbImage = 1;
-			float nbImageLoaded = 1;
-			for (int t = frameStart; t <= frameEnd; t+= analysisStep) {
-				nbImage++;
-				if (getImage(t, 0) != null)
-					nbImageLoaded++;
-			}
-			currentBufferPercent = (int) (nbImageLoaded * 100f / nbImage);
-			return currentBufferPercent;
-		}
-
-		@Override
-		public void run()
-		{
-			try
-			{
-				while (!isInterrupted())
-				{
-					ThreadUtil.sleep(100);
-
-					int frameStart 	= currentFrame - span;
-					int frameEnd 	= currentFrame + span;
-					if (frameStart < 0) 
-						frameStart = 0;
-					if (frameEnd > nTotalFrames) 
-						frameEnd = nTotalFrames;
-			
-					// clean all images except those within the buffer 
-					for (int t = 0; t < nTotalFrames-1 ; t+= analysisStep) { // t++) {
-						if (t < frameStart || t > frameEnd)
-							removeImage(t, 0);
-						
-						if (isInterrupted())
-							return;
-					}
-					
-					for (int t = frameStart; t < frameEnd ; t+= analysisStep) {	
-						setVImage(t);
-						if (isInterrupted())
-							return;
-					}
-				}			
-			}
-			catch (final Exception e) 
-			{ e.printStackTrace(); }
-		}
 	}
 
 	public IcyBufferedImage subtractImages (IcyBufferedImage image1, IcyBufferedImage image2) 
@@ -542,8 +449,8 @@ public class SequenceVirtual extends Sequence
 		return directory;
 	}
 	
-	public String loadVirtualStackAt(String textPath) {
-
+	public String loadVirtualStackAt(String textPath) 
+	{
 		if (textPath == null) 
 			return loadInputVirtualStack(null); 
 		
@@ -607,10 +514,12 @@ public class SequenceVirtual extends Sequence
 			loadSequenceVirtual(list, directory);
 	}
 	
-	private void loadSequenceVirtualAVI(String fileName) {
+	private void loadSequenceVirtualAVI(String fileName) 
+	{
 		if (importer != null )
 		{
-			try {
+			try 
+			{
 				importer.close();
 			} catch (IOException e) {
 				e.printStackTrace();
@@ -633,7 +542,8 @@ public class SequenceVirtual extends Sequence
 		}
 	}
 	
-	private void loadSequenceVirtual(String[] list, String directory) {
+	private void loadSequenceVirtual(String[] list, String directory) 
+	{
 		status = EnumStatus.FAILURE;
 		list = keepOnlyAcceptedNames(list);
 		if (list==null) 
@@ -641,8 +551,9 @@ public class SequenceVirtual extends Sequence
 
 		listFiles = new String [list.length];
 		int j = 0;
-		for (int i=0; i<list.length; i++) {
-			if (list[i]!=null)
+		for (int i=0; i<list.length; i++) 
+		{
+			if (list[i]!= null)
 				listFiles [j++] = directory + '/'+ list[i];
 		}
 		listFiles = StringSorter.sortNumerically(listFiles);
@@ -656,7 +567,8 @@ public class SequenceVirtual extends Sequence
 			setName(getDecoratedImageName(t));
 	}
 
-	public String getFileName() {
+	public String getFileName() 
+	{
 		String fileName;
 		if (status == EnumStatus.FILESTACK) 
 			fileName = listFiles[0];
@@ -665,55 +577,64 @@ public class SequenceVirtual extends Sequence
 		return fileName;		
 	}
 	
-	public void setFileName(String name) {
+	public void setFileName(String name) 
+	{
 		csFileName = name;		
 	}
 	
-	public void storeAnalysisParametersToCages() {
-		cages.detect.analysisEnd = analysisEnd;
-		cages.detect.analysisStart = analysisStart;
-		cages.detect.analysisStep = analysisStep;
+	public void storeAnalysisParametersToCages() 
+	{
+		cagesRoi2RoiArray.detect.analysisEnd = analysisEnd;
+		cagesRoi2RoiArray.detect.analysisStart = analysisStart;
+		cagesRoi2RoiArray.detect.analysisStep = analysisStep;
 	}
 	
-	public void storeAnalysisParametersToCapillaries () {
-		capillaries.analysisStart = analysisStart;
-		capillaries.analysisEnd = analysisEnd;
-		capillaries.analysisStep = analysisStep;
+	public void storeAnalysisParametersToCapillaries () 
+	{
+		capillariesRoi2RoiArray.analysisStart = analysisStart;
+		capillariesRoi2RoiArray.analysisEnd = analysisEnd;
+		capillariesRoi2RoiArray.analysisStep = analysisStep;
 	}
 	
-	public boolean xmlReadCapillaryTrackDefault() {
+	public boolean xmlReadCapillaryTrackDefault() 
+	{
 		return xmlReadCapillaryTrack(getDirectory()+File.separator+"capillarytrack.xml");
 	}
 	
-	public boolean xmlReadCapillaryTrack(String filename) {
-		boolean flag = capillaries.xmlReadROIsAndData(filename, this);
+	public boolean xmlReadCapillaryTrack(String filename) 
+	{
+		boolean flag = capillariesRoi2RoiArray.xmlReadROIsAndData(filename, this);
 		if (flag) {
-			analysisStart = capillaries.analysisStart;
-			analysisEnd = capillaries.analysisEnd;
-			analysisStep = capillaries.analysisStep;
+			analysisStart = capillariesRoi2RoiArray.analysisStart;
+			analysisEnd = capillariesRoi2RoiArray.analysisEnd;
+			analysisStep = capillariesRoi2RoiArray.analysisStep;
 		}
 		return flag;
 	}
 		
-	public boolean xmlReadDrosoTrackDefault() {
-		return cages.xmlReadCagesFromFileNoQuestion(getDirectory() + File.separator+"drosotrack.xml", this);
+	public boolean xmlReadDrosoTrackDefault() 
+	{
+		return cagesRoi2RoiArray.xmlReadCagesFromFileNoQuestion(getDirectory() + File.separator+"drosotrack.xml", this);
 	}
 	
-	public boolean xmlReadDrosoTrack(String filename) {
-		boolean flag = cages.xmlReadCagesFromFileNoQuestion(filename, this);
+	public boolean xmlReadDrosoTrack(String filename) 
+	{
+		boolean flag = cagesRoi2RoiArray.xmlReadCagesFromFileNoQuestion(filename, this);
 		if (flag) {
-			analysisStart = cages.detect.analysisStart;
-			analysisEnd = cages.detect.analysisEnd;
-			analysisStep = cages.detect.analysisStep;
+			analysisStart = cagesRoi2RoiArray.detect.analysisStart;
+			analysisEnd = cagesRoi2RoiArray.detect.analysisEnd;
+			analysisStep = cagesRoi2RoiArray.detect.analysisStep;
 		}
 		return flag;
 	}
 	
-	public boolean xmlWriteDrosoTrackDefault() {
-		return cages.xmlWriteCagesToFile("drosotrack.xml", getDirectory());
+	public boolean xmlWriteDrosoTrackDefault() 
+	{
+		return cagesRoi2RoiArray.xmlWriteCagesToFile("drosotrack.xml", getDirectory());
 	}
 	
-	public FileTime getImageModifiedTime (int t) {
+	public FileTime getImageModifiedTime (int t) 
+	{
 		String name = getFileName(t);
 		Path path = Paths.get(name);
 		FileTime fileTime;
