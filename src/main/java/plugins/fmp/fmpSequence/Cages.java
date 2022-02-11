@@ -53,10 +53,10 @@ public class Cages
 		return true;
 	}
 	
-	public boolean xmlReadCagesFromFile(SequenceVirtual seq) {
+	public boolean xmlReadCagesFromFile(SequenceVirtual sequenceVirtual) {
 
 		String [] filedummy = null;
-		String filename = seq.getFileName();
+		String filename = sequenceVirtual.seq.getFilename();
 		File file = new File(filename);
 		String directory = file.getParentFile().getAbsolutePath();
 		filedummy = FmpTools.selectFiles(directory, "xml");
@@ -64,7 +64,7 @@ public class Cages
 		if (filedummy != null) {
 			for (int i= 0; i< filedummy.length; i++) {
 				String csFile = filedummy[i];
-				wasOk &= xmlReadCagesFromFileNoQuestion(csFile, seq);
+				wasOk &= xmlReadCagesFromFileNoQuestion(csFile, sequenceVirtual);
 			}
 		}
 		return wasOk;
@@ -174,21 +174,21 @@ public class Cages
 		return true;
 	}
 	
-	private void replaceROIsInSequence(SequenceVirtual seq) {
-		ArrayList<ROI2D> list = seq.getROI2Ds();
+	private void replaceROIsInSequence(SequenceVirtual sequenceVirtual) {
+		ArrayList<ROI2D> list = sequenceVirtual.seq.getROI2Ds();
 		for (ROI2D roi: list) {
 			if (!(roi instanceof ROI2DShape))
 				continue;
 			if (!roi.getName().contains("cage"))
 				continue;
-			seq.removeROI(roi);
+			sequenceVirtual.seq.removeROI(roi);
 		}
-		seq.addROIs(cageLimitROIList, true);
+		sequenceVirtual.seq.addROIs(cageLimitROIList, true);
 	}
 	
-	public void getCagesFromSequence(SequenceVirtual seq) {
+	public void getCagesFromSequence(SequenceVirtual sequenceVirtual) {
 		cageLimitROIList.clear();
-		ArrayList<ROI2D> list = seq.getROI2Ds();
+		ArrayList<ROI2D> list = sequenceVirtual.seq.getROI2Ds();
 		for (ROI2D roi: list) {
 			if (!(roi instanceof ROI2DShape))
 				continue;

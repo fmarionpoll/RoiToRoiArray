@@ -84,7 +84,7 @@ public class Capillaries {
 		return true;
 	}
 	
-	private boolean xmlWriteCapillaryParameters (Document doc, SequenceVirtual seq) {
+	private boolean xmlWriteCapillaryParameters (Document doc, SequenceVirtual sequenceVirtual) {
 		String nodeName = "capillaryTrack";
 		Node node = XMLUtil.addElement(XMLUtil.getRootElement(doc), nodeName);
 		if (node == null)
@@ -93,7 +93,7 @@ public class Capillaries {
 		Element xmlElement = XMLUtil.addElement(node, "Parameters");
 		
 		Element xmlVal = XMLUtil.addElement(xmlElement, "file");
-		sourceName = seq.getFileName();
+		sourceName = sequenceVirtual.getFileName(0);
 		XMLUtil.setAttributeValue(xmlVal, "ID", sourceName);
 		
 		xmlVal = XMLUtil.addElement(xmlElement, "Grouping");
@@ -106,9 +106,9 @@ public class Capillaries {
 		XMLUtil.setAttributeDoubleValue(xmlVal, "npixels", pixels);
 
 		xmlVal = XMLUtil.addElement(xmlElement, "analysis");
-		XMLUtil.setAttributeLongValue(xmlVal, "start", seq.analysisStart);
-		XMLUtil.setAttributeLongValue(xmlVal, "end", seq.analysisEnd); 
-		XMLUtil.setAttributeIntValue(xmlVal, "step", seq.analysisStep); 
+		XMLUtil.setAttributeLongValue(xmlVal, "start", sequenceVirtual.analysisStart);
+		XMLUtil.setAttributeLongValue(xmlVal, "end", sequenceVirtual.analysisEnd); 
+		XMLUtil.setAttributeIntValue(xmlVal, "step", sequenceVirtual.analysisStep); 
 		
 		xmlVal = XMLUtil.addElement(xmlElement,  "LRstimulus");
 		XMLUtil.setAttributeValue(xmlVal, "stimR", stimulusR);
@@ -124,10 +124,10 @@ public class Capillaries {
 		return true;
 	}
 	
-	public void extractLinesFromSequence(SequenceVirtual seq) {
+	public void extractLinesFromSequence(SequenceVirtual sequenceVirtual) {
 
 		capillariesArrayList.clear();
-		ArrayList<ROI2D> list = seq.getROI2Ds();
+		ArrayList<ROI2D> list = sequenceVirtual.seq.getROI2Ds();
 		 
 		for (ROI2D roi:list)
 		{
@@ -174,9 +174,9 @@ public class Capillaries {
 		return false;
 	}
 	
-	public boolean xmlWriteROIsAndDataNoFilter(String name, SequenceVirtual seq) {
+	public boolean xmlWriteROIsAndDataNoFilter(String name, SequenceVirtual sequenceVirtual) {
 
-		String csFile = FmpTools.saveFileAs(name, seq.getDirectory(), "xml");
+		String csFile = FmpTools.saveFileAs(name, sequenceVirtual.getDirectory(), "xml");
 		csFile.toLowerCase();
 		if (!csFile.contains(".xml")) {
 			csFile += ".xml";
@@ -185,9 +185,9 @@ public class Capillaries {
 		final Document doc = XMLUtil.createDocument(true);
 		if (doc != null)
 		{
-			List<ROI> roisList = seq.getROIs();
+			List<ROI> roisList = sequenceVirtual.seq.getROIs();
 			ROI.saveROIsToXML(XMLUtil.getRootElement(doc), roisList);
-			xmlWriteCapillaryParameters (doc, seq);
+			xmlWriteCapillaryParameters (doc, sequenceVirtual);
 			XMLUtil.saveDocument(doc, csFile);
 			return true;
 		}
@@ -195,10 +195,10 @@ public class Capillaries {
 		return false;
 	}
 	
-	public boolean xmlReadROIsAndData(SequenceVirtual seq) {
+	public boolean xmlReadROIsAndData(SequenceVirtual sequenceVirtual) {
 
 		String [] filedummy = null;
-		String filename = seq.getFileName();
+		String filename = sequenceVirtual.seq.getName();
 		File file = new File(filename);
 		String directory = file.getParentFile().getAbsolutePath();
 		filedummy = FmpTools.selectFiles(directory, "xml");
@@ -206,13 +206,13 @@ public class Capillaries {
 		if (filedummy != null) {
 			for (int i= 0; i< filedummy.length; i++) {
 				String csFile = filedummy[i];
-				wasOk &= xmlReadROIsAndData(csFile, seq);
+				wasOk &= xmlReadROIsAndData(csFile, sequenceVirtual);
 			}
 		}
 		return wasOk;
 	}
 	
-	public boolean xmlReadROIsAndData(String csFileName, SequenceVirtual seq) {
+	public boolean xmlReadROIsAndData(String csFileName, SequenceVirtual sequenceVirtual) {
 		
 		if (csFileName != null)  {
 			final Document doc = XMLUtil.loadDocument(csFileName);
@@ -225,13 +225,13 @@ public class Capillaries {
 				Collections.sort(capillariesArrayList, new FmpTools.ROINameComparator()); 
 				try  {  
 					for (ROI roi : capillariesArrayList)  {
-						seq.addROI(roi);
+						sequenceVirtual.seq.addROI(roi);
 					}
 				}
 				finally {
 				}
 				// add to undo manager
-				seq.addUndoableEdit(new ROIAddsSequenceEdit(seq, listOfROIs) {
+				sequenceVirtual.seq.addUndoableEdit(new ROIAddsSequenceEdit(sequenceVirtual.seq, listOfROIs) {
 					@Override
 					public String getPresentationName() {
 						return getROIs().size() + " ROI(s) loaded from XML file"; };

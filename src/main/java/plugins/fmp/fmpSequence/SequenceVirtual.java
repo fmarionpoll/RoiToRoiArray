@@ -8,6 +8,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.attribute.FileTime;
+import java.util.List;
 
 import icy.image.IcyBufferedImage;
 import icy.image.IcyBufferedImageUtil;
@@ -24,12 +25,14 @@ import plugins.stef.importer.xuggler.VideoImporter;
 
 
 
-public class SequenceVirtual extends Sequence 
+public class SequenceVirtual 
 {
+	public Sequence			seq				= null;
 	protected VideoImporter importer 		= null;
-	private String [] 		imagesList 		= null;
+	private List <String> 	imagesList 		= null;
 	private String 			csFileName 		= null;
 	private String			directory 		= null;
+	protected String 		csCamFileName 	= null;
 	public IcyBufferedImage refImage 		= null;
 	
 	public long				analysisStart 	= 0;
@@ -41,8 +44,8 @@ public class SequenceVirtual extends Sequence
 	public boolean			bBufferON 		= false;
 	public EnumStatus 		statusSequenceVirtual = EnumStatus.REGULAR;
 	
-	public Capillaries 		capillariesRoi2RoiArray 	= new Capillaries();
-	public Cages			cagesRoi2RoiArray 			= new Cages();
+	public Capillaries 		capillariesRoi2RoiArray = new Capillaries();
+	public Cages			cagesRoi2RoiArray 		= new Cages();
 	
 	public String [] 		seriesname 		= null;
 	public int [][] 		data_raw 		= null;
@@ -57,38 +60,39 @@ public class SequenceVirtual extends Sequence
 	// ----------------------------------------
 	public SequenceVirtual () 
 	{
+		seq = new Sequence();
+		statusSequenceVirtual = EnumStatus.REGULAR;
+	}
+	
+	public SequenceVirtual (Sequence seq) 
+	{
+		this.seq = seq;
 		statusSequenceVirtual = EnumStatus.REGULAR;
 	}
 	
 	public SequenceVirtual(String name, IcyBufferedImage image) 
 	{
-		super (name, image);
+		seq = new Sequence (name, image);
+		statusSequenceVirtual = EnumStatus.FILESTACK;
 	}
 	
-	public SequenceVirtual (Sequence seq) 
+	public SequenceVirtual(List<String> listNames) 
 	{
-		int nfiles = seq.getSizeT();
-		String fileList[] = new String[nfiles];
-		String directory = null;
-		for(int t=0; t < nfiles; t++) 
-		{
-			String firstfile = seq.getFilename (0, t, 0);
-			if (firstfile == null)
-				continue;
-			Path path = Paths.get(firstfile);
-			if (t == 0) 
-				directory = path.getParent().toString();
-			String filename = path.getFileName().toString();
-			fileList[t] = filename;
-		}
-		
-		filename = directory + ".xml";		
+		setV2ImagesList(listNames);
+		statusSequenceVirtual = EnumStatus.FILESTACK;
+	}
+	
+	public void setV2ImagesList(List <String> extImagesList) 
+	{
+		imagesList.clear();
+		imagesList.addAll(extImagesList);
+		nTotalFrames = imagesList.size();
+		statusSequenceVirtual = EnumStatus.FILESTACK;
 	}
 
-	@Override
 	public void close() 
 	{
-		super.close();
+		seq.close();
 	}
 
 	public String getDirectory () 
@@ -96,18 +100,16 @@ public class SequenceVirtual extends Sequence
 		return directory;
 	}
 
-	@Override
 	public IcyBufferedImage getImage(int t, int z, int c) 
 	{
-		IcyBufferedImage image =  super.getImage(t, z, c);
+		IcyBufferedImage image =  seq.getImage(t, z, c);
 		currentFrame = t;
 		return image;
 	}
 
-	@Override
 	public IcyBufferedImage getImage(int t, int z) 
 	{
-		IcyBufferedImage image = super.getImage(t, z);
+		IcyBufferedImage image = seq.getImage(t, z);
 		currentFrame = t;
 		return image;
 	}
@@ -122,12 +124,12 @@ public class SequenceVirtual extends Sequence
 	
 	public IcyBufferedImage loadVImage(int t, int z) 
 	{
-		return super.getImage(t, z);
+		return seq.getImage(t, z);
 	}
 	
 	public IcyBufferedImage loadVImage(int t) 
 	{
-		return super.getImage(t, 0);
+		return seq.getImage(t, 0);
 	}
 	
 	public IcyBufferedImage loadVImageAndSubtractReference(int t, EnumImageOp transformop) 
@@ -158,7 +160,7 @@ public class SequenceVirtual extends Sequence
 		return ibufImage;
 	}
 		
-	public String[] getListofFiles() 
+	public List<String> getListofFiles() 
 	{
 		return imagesList;
 	}
@@ -169,11 +171,11 @@ public class SequenceVirtual extends Sequence
 	 * getSizeT is used to evaluate if volumetric images are stored in the sequence
 	 * SequenceVirtual does not support volumetric images 
 	 */
-	@Override
+
 	public int getSizeT() 
 	{
 		if (statusSequenceVirtual == EnumStatus.REGULAR)
-			return super.getSizeT();
+			return seq.getSizeT();
 		else 
 			return (int) nTotalFrames;
 	}
@@ -194,15 +196,27 @@ public class SequenceVirtual extends Sequence
 	public String getDecoratedImageName(int t) 
 	{
 		currentFrame = t; 
-		return getFileName() + " ["+(t)+ "/" + (getSizeT()-1) + "]";
-		
+		if (seq!= null)
+			return getCSCamFileName() + " ["+(t)+ "/" + (seq.getSizeT()-1) + "]";
+		else
+			return getCSCamFileName() + "[]";
+	}
+	
+	private String getCSCamFileName() 
+	{
+		if (csCamFileName == null) 
+		{
+			Path path = Paths.get(imagesList.get(0));
+			csCamFileName = path.subpath(path.getNameCount()-4, path.getNameCount()-1).toString();
+		}
+		return csCamFileName;		
 	}
 	
 	public String getFileName(int t) 
 	{
 		String csName = null;
 		if (statusSequenceVirtual == EnumStatus.FILESTACK) 
-			csName = imagesList[t];
+			csName = imagesList.get(t);
 		else if (statusSequenceVirtual == EnumStatus.AVIFILE)
 			csName = csFileName;
 		return csName;
@@ -215,17 +229,15 @@ public class SequenceVirtual extends Sequence
 
 	public boolean setCurrentVImage(int t) 
 	{
-		IcyBufferedImage bimage = super.getImage(t, 0);
-		super.setImage(t, 0, bimage);
-		setVImageName(t);		
+		IcyBufferedImage bimage = seq.getImage(t, 0);
+		seq.setImage(t, 0, bimage);		
 		currentFrame = t;
 		return true;
 	}
 
-	@Override
 	public void setImage(int t, int z, BufferedImage bimage) throws IllegalArgumentException 
 	{
-		super.setImage(t, z, bimage);
+		seq.setImage(t, z, bimage);
 		currentFrame = t;
 	}
 
@@ -250,28 +262,7 @@ public class SequenceVirtual extends Sequence
 	}
 	
 	// --------------------------------------------------------------------
-		
-	private void setVImageName(int t)
-	{
-		if (statusSequenceVirtual == EnumStatus.FILESTACK)
-			setName(getDecoratedImageName(t));
-	}
-
-	public String getFileName() 
-	{
-		String fileName;
-		if (statusSequenceVirtual == EnumStatus.FILESTACK) 
-			fileName = imagesList[0];
-		else //  if ((status == EnumStatus.AVIFILE))
-			fileName = csFileName;
-		return fileName;		
-	}
-	
-	public void setFileName(String name) 
-	{
-		csFileName = name;		
-	}
-	
+			
 	public void storeAnalysisParametersToCages() 
 	{
 		cagesRoi2RoiArray.detect.analysisEnd = analysisEnd;

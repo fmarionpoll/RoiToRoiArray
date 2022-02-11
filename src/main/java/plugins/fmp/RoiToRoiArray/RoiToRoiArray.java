@@ -208,7 +208,7 @@ public class RoiToRoiArray extends EzPlug implements ViewerListener
 		
 		virtualSequence = new SequenceVirtual(seq);
 		seq.getFirstViewer().close();
-		Icy.getMainInterface().addSequence(virtualSequence);
+		Icy.getMainInterface().addSequence(virtualSequence.seq);
 	}
 	
 	private void findLines() 
@@ -459,7 +459,7 @@ public class RoiToRoiArray extends EzPlug implements ViewerListener
 
 		mainChartFrame.add(mainPanel);
 		mainChartFrame.pack();
-		Viewer v = virtualSequence.getFirstViewer();
+		Viewer v = virtualSequence.seq.getFirstViewer();
 		Rectangle rectv = v.getBounds();
 		Point pt = new Point((int) rectv.getX(), (int) rectv.getY()+30);
 		mainChartFrame.setLocation(pt);
@@ -740,7 +740,7 @@ public class RoiToRoiArray extends EzPlug implements ViewerListener
 		if (virtualSequence.cacheThresholdedImage == null)
 			return;
 		// get byte image (0, 1) that has been thresholded
-		ArrayList<ROI2D> roiList = virtualSequence.getROI2Ds();
+		ArrayList<ROI2D> roiList = virtualSequence.seq.getROI2Ds();
 		Collections.sort(roiList, new FmpTools.ROI2DNameComparator());
 		
 		for (ROI2D roi:roiList) {
@@ -942,17 +942,17 @@ public class RoiToRoiArray extends EzPlug implements ViewerListener
 			
 			if (thresholdOverlay == null) {
 				thresholdOverlay = new OverlayThreshold(virtualSequence);
-				virtualSequence.addOverlay(thresholdOverlay);
+				virtualSequence.seq.addOverlay(thresholdOverlay);
 			}
 			virtualSequence.cagesRoi2RoiArray.detect.threshold = thresholdOv.getValue();
-			virtualSequence.addOverlay(thresholdOverlay);
+			virtualSequence.seq.addOverlay(thresholdOverlay);
 			updateOverlay();
 		}
 		else  {
 			if (virtualSequence == null)
 				return;
 			if (thresholdOverlay != null) 
-				virtualSequence.removeOverlay(thresholdOverlay);
+				virtualSequence.seq.removeOverlay(thresholdOverlay);
 			thresholdOverlay = null;
 		}
 	}
@@ -970,7 +970,7 @@ public class RoiToRoiArray extends EzPlug implements ViewerListener
 			return;
 		if (thresholdOverlay == null) {
 			thresholdOverlay = new OverlayThreshold(virtualSequence);
-			virtualSequence.addOverlay(thresholdOverlay);
+			virtualSequence.seq.addOverlay(thresholdOverlay);
 		}
 		EnumImageOp transformop = filterComboBox.getValue();
 
@@ -988,7 +988,8 @@ public class RoiToRoiArray extends EzPlug implements ViewerListener
 		if (virtualSequence != null) 
 			virtualSequence.close();
 
-		virtualSequence = OpenVirtualSequence.loadInputVirtualStack(null);
+		SequenceVirtual virtualSequence = new SequenceVirtual();
+		virtualSequence.seq = OpenVirtualSequence.openImagesOrAvi(null);
 		String path = virtualSequence.getDirectory();
 		if (path != null) 
 		{
@@ -1158,12 +1159,12 @@ public class RoiToRoiArray extends EzPlug implements ViewerListener
 	
 	private void initInputSeq () 
 	{
-		addSequence(virtualSequence);
-		ezSequence.setValue(virtualSequence);
-		Viewer v = virtualSequence.getFirstViewer();
+		addSequence(virtualSequence.seq);
+		ezSequence.setValue(virtualSequence.seq);
+		Viewer v = virtualSequence.seq.getFirstViewer();
 		v.addListener(RoiToRoiArray.this);
 
-		virtualSequence.removeAllImages();
+		virtualSequence.seq.removeAllImages();
 	}
 	
 	@Override
@@ -1182,7 +1183,7 @@ public class RoiToRoiArray extends EzPlug implements ViewerListener
 	
 	private void openXMLFile() 
 	{
-		virtualSequence.removeAllROI();
+		virtualSequence.seq.removeAllROI();
 		virtualSequence.capillariesRoi2RoiArray.xmlReadROIsAndData(virtualSequence);
 //		vSequence.cages.xmlReadCagesFromFile(vSequence);
 	}
@@ -1195,7 +1196,7 @@ public class RoiToRoiArray extends EzPlug implements ViewerListener
 	
 	private void changeGridName() 
 	{
-		List<ROI> roisList = virtualSequence.getROIs(true);
+		List<ROI> roisList = virtualSequence.seq.getROIs(true);
 		String baseName = ezRootnameComboBox.getValue();
 		
 		for (ROI roi : roisList) {

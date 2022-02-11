@@ -9,13 +9,14 @@ import icy.file.Loader;
 import icy.file.SequenceFileImporter;
 import icy.gui.dialog.LoaderDialog;
 import icy.gui.dialog.MessageDialog;
+import icy.sequence.Sequence;
 import ome.xml.meta.OMEXMLMetadata;
 import plugins.fmp.fmpTools.StringSorter;
 import plugins.stef.importer.xuggler.VideoImporter;
 
 public class OpenVirtualSequence {
 	
-	public static EnumStatus statusSequenceVirtual = EnumStatus.REGULAR;
+	public static EnumStatus statusSequence = EnumStatus.REGULAR;
 	protected static VideoImporter importer 		= null;
 	private final static String[] acceptedTypes = {".jpg", ".jpeg", ".bmp", "tiff"};
 	private String directory 		= null;
@@ -32,7 +33,7 @@ public class OpenVirtualSequence {
 	}
 	*/
 	
-	static public SequenceVirtual loadInputVirtualStack(String path) 
+	static public Sequence openImagesOrAvi(String path) 
 	{
 		LoaderDialog dialog = new LoaderDialog(false);
 		if (path != null) 
@@ -49,7 +50,7 @@ public class OpenVirtualSequence {
 		if (directory == null )
 			return null;
 
-		SequenceVirtual sequenceVirtual = null;
+		Sequence seq = null;
 		String [] list;
 		if (selectedFiles.length == 1) 
 		{
@@ -57,10 +58,18 @@ public class OpenVirtualSequence {
 			if (list ==null)
 				return null;
 			
-			if (!(selectedFiles[0].isDirectory()) && selectedFiles[0].getName().toLowerCase().contains(".avi")) 
+			if (!selectedFiles[0].isDirectory())  
 			{
-				sequenceVirtual = loadSequenceVirtualAVI(selectedFiles[0].getAbsolutePath());
+				if (selectedFiles[0].getName().toLowerCase().contains(".avi"))
+					seq = loadSequenceAVI(selectedFiles[0].getAbsolutePath());
+				else
+				{
+					String[] imagesArray = getAcceptedNamesFromImagesList(list, directory);
+					List <String> imagesList = Arrays.asList(imagesArray);
+					seq = loadV2SequenceFromImagesList(imagesList);
+				}
 			}
+			
 		}
 		else
 		{
@@ -72,15 +81,15 @@ public class OpenVirtualSequence {
 			}
 			String[] imagesArray = getAcceptedNamesFromImagesList(list, directory);
 			List <String> imagesList = Arrays.asList(imagesArray);
-			sequenceVirtual = loadV2SequenceFromImagesList(imagesList);
+			seq = loadV2SequenceFromImagesList(imagesList);
 		}
 		
-		return sequenceVirtual;
+		return seq;
 	}
 	
-	private static SequenceVirtual loadSequenceVirtualAVI(String fileName) 
+	private static Sequence loadSequenceAVI(String fileName) 
 	{
-		SequenceVirtual sequenceVirtual = null;
+		Sequence sequenceVirtual = null;
 		if (importer != null )
 		{
 			try 
@@ -95,7 +104,7 @@ public class OpenVirtualSequence {
 		try
 		{
 			importer = new VideoImporter();
-			statusSequenceVirtual = EnumStatus.AVIFILE;
+			statusSequence = EnumStatus.AVIFILE;
 			importer.open( fileName, 0 );
 			OMEXMLMetadata metaData = importer.getOMEXMLMetaData();
 			//nTotalFrames = MetaDataUtil.getSizeT( metaData, 0 ) - 2 ; 
@@ -104,14 +113,14 @@ public class OpenVirtualSequence {
 		catch (Exception exc)
 		{
 			MessageDialog.showDialog( "File type or video-codec not supported.", MessageDialog.ERROR_MESSAGE );
-			statusSequenceVirtual = EnumStatus.FAILURE;
+			statusSequence = EnumStatus.FAILURE;
 		}
 		return sequenceVirtual;
 	}
 	
 	private static String[] getAcceptedNamesFromImagesList(String[] list, String directory) 
 	{
-		statusSequenceVirtual = EnumStatus.FAILURE;
+		statusSequence = EnumStatus.FAILURE;
 		String[] imagesList = keepOnlyAcceptedNames(list);
 		if (list==null) 
 			return null;
@@ -123,7 +132,7 @@ public class OpenVirtualSequence {
 				imagesList [j++] = directory + '/'+ list[i];
 		}
 		imagesList = StringSorter.sortNumerically(imagesList);
-		statusSequenceVirtual = EnumStatus.FILESTACK;
+		statusSequence = EnumStatus.FILESTACK;
 		return imagesList;
 	}
 	
@@ -166,75 +175,51 @@ public class OpenVirtualSequence {
 		return false;
 	}	
 	
-	private void loadSequenceVirtualStackFromName(String name) 
+	private Sequence loadSequenceStackFromName(String name) 
 	{
 		File filename = new File (name);
+		Sequence seq = null;
 		if (filename.isDirectory())
 	    	directory = filename.getAbsolutePath();
 	    else {
 	    	directory = filename.getParentFile().getAbsolutePath();
 	    }
 		if (directory == null) {
-			statusSequenceVirtual = EnumStatus.FAILURE;
-			return;
+			statusSequence = EnumStatus.FAILURE;
+			return seq;
 		}
-		String [] list;
+		String [] imagesArray;
 		File fdir = new File(directory);
 		boolean flag = fdir.isDirectory();
 		if (!flag)
-			return;
-		list = fdir.list();
+			return seq;
+		imagesArray = fdir.list();
 		// TODO: change directory into a pathname
-		if (list != null)
-			getAcceptedNamesFromImagesList(list, directory);
-	}
-	
-	public void loadSequenceVirtualFromName(String name)
-	{
-		if (name.toLowerCase().contains(".avi"))
-			loadSequenceVirtualAVI(name);
-		else
-			loadSequenceVirtualStackFromName(name);
-	}
-	
-	public static SequenceVirtual loadV2SequenceFromImagesList(List <String> imagesList) 
-	{
-		SequenceFileImporter seqFileImporter = Loader.getSequenceFileImporter(imagesList.get(0), true);
-		SequenceVirtual seq = (SequenceVirtual) Loader.loadSequence(seqFileImporter, imagesList, false);
+		if (imagesArray != null) {
+			getAcceptedNamesFromImagesList(imagesArray, directory);
+			List <String> imagesList = Arrays.asList(imagesArray);
+			seq = loadV2SequenceFromImagesList(imagesList);
+		}
 		return seq;
 	}
 	
-	public SequenceVirtual loadVirtualStackAt(String textPath) 
+	public Sequence loadSequenceVirtualFromName(String name)
 	{
-		if (textPath == null) 
-			return loadInputVirtualStack(null); 
-		
-		File filepath = new File(textPath); 
-	    if (filepath.isDirectory())
-	    	directory = filepath.getAbsolutePath();
-	    else
-	    	directory = filepath.getParentFile().getAbsolutePath();
-		if (directory == null )
-			return null;
-
-		String [] list;
-		list = (new File(directory)).list();
-		if (list ==null)
-			return null;
-		
-		SequenceVirtual sequenceVirtual = null;
-		if (!(filepath.isDirectory()) && filepath.getName().toLowerCase().contains(".avi")) 
-		{
-			sequenceVirtual = loadSequenceVirtualAVI(filepath.getAbsolutePath());
-		}
-		else 
-		{
-			String[] imagesArray = getAcceptedNamesFromImagesList(list, directory);
-			List<String> imagesList = Arrays.asList(imagesArray);
-			sequenceVirtual = loadV2SequenceFromImagesList(imagesList);
-		}
-		return sequenceVirtual;
+		Sequence seq = null;
+		if (name.toLowerCase().contains(".avi"))
+			seq = loadSequenceAVI(name);
+		else
+			seq = loadSequenceStackFromName(name);
+		return seq;
 	}
+	
+	public static Sequence loadV2SequenceFromImagesList(List <String> imagesList) 
+	{
+		SequenceFileImporter seqFileImporter = Loader.getSequenceFileImporter(imagesList.get(0), true);
+		Sequence seq = Loader.loadSequence(seqFileImporter, imagesList, false);
+		return seq;
+	}
+	
 	
 	public String loadInputVirtualFromNameSavedInRoiXML(String csFileName)
 	{
