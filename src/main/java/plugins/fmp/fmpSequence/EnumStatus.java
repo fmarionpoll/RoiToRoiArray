@@ -1,5 +1,5 @@
 package plugins.fmp.fmpSequence;
 
 public enum EnumStatus {
-	AVIFILE, FILESTACK, REGULAR, FAILURE 
+	AVIFILE, FILESTACK, REGULAR, KYMOGRAPH, FAILURE 
 }

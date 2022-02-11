@@ -16,7 +16,8 @@ import plugins.fmp.fmpTools.FmpTools;
 import plugins.kernel.roi.roi2d.ROI2DPolygon;
 
 
-public class Cages {
+public class Cages 
+{
 	
 	public DetectFliesParameters 	detect 					= new DetectFliesParameters();
 	public ArrayList<ROI2D> 		cageLimitROIList		= new ArrayList<ROI2D>();
