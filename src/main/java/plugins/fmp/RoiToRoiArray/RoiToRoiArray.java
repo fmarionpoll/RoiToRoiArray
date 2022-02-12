@@ -990,11 +990,9 @@ public class RoiToRoiArray extends EzPlug implements ViewerListener
 	
 	private void addSequenceToEzSequenceCombo (Sequence seq) 
 	{
-//		addSequence(seq);
 		ezSequence.setValue(seq);
 		Viewer v = seq.getFirstViewer();
 		v.addListener(RoiToRoiArray.this);
-//		virtualSequence.seq.removeAllImages();
 	}
 	
 	// ----------------------------------
