@@ -100,18 +100,10 @@ public class SequenceVirtual
 		return directory;
 	}
 
-	public IcyBufferedImage getImage(int t, int z, int c) 
+	public IcyBufferedImage getSeqImage(int t, int z) 
 	{
-		IcyBufferedImage image =  seq.getImage(t, z, c);
 		currentFrame = t;
-		return image;
-	}
-
-	public IcyBufferedImage getImage(int t, int z) 
-	{
-		IcyBufferedImage image = seq.getImage(t, z);
-		currentFrame = t;
-		return image;
+		return seq.getImage(t, z);
 	}
 	
 	public IcyBufferedImage getImageTransf(int t, int z, int c, EnumImageOp transformop) 
@@ -121,20 +113,10 @@ public class SequenceVirtual
 			image = IcyBufferedImageUtil.extractChannel(image, c);
 		return image;
 	}
-	
-	public IcyBufferedImage loadVImage(int t, int z) 
-	{
-		return seq.getImage(t, z);
-	}
-	
-	public IcyBufferedImage loadVImage(int t) 
-	{
-		return seq.getImage(t, 0);
-	}
-	
+		
 	public IcyBufferedImage loadVImageAndSubtractReference(int t, EnumImageOp transformop) 
 	{
-		IcyBufferedImage ibufImage = loadVImage(t);
+		IcyBufferedImage ibufImage = seq.getImage(t, 0);
 		switch (transformop) 
 		{
 			case REF_PREVIOUS: // subtract image n-analysisStep
@@ -142,14 +124,14 @@ public class SequenceVirtual
 				int t0 = t-analysisStep;
 				if (t0 <0)
 					t0 = 0;
-				IcyBufferedImage ibufImage0 = loadVImage(t0);
+				IcyBufferedImage ibufImage0 = seq.getImage(t0, 0);
 				ibufImage = subtractImages (ibufImage, ibufImage0);
 			}	
 				break;
 			case REF_T0: // subtract reference image
 			case REF:
 				if (refImage == null)
-					refImage = loadVImage((int) analysisStart);
+					refImage = seq.getImage((int) analysisStart, 0);
 				ibufImage = subtractImages (ibufImage, refImage);
 				break;
 
@@ -187,7 +169,7 @@ public class SequenceVirtual
 
 	public double getVData(int t, int z, int c, int y, int x) 
 	{
-		final IcyBufferedImage img = loadVImage(t);
+		final IcyBufferedImage img = seq.getImage(t, 0);
 		if (img != null)
 			return img.getData(x, y, c);
 		return 0d;
@@ -240,7 +222,6 @@ public class SequenceVirtual
 		seq.setImage(t, z, bimage);
 		currentFrame = t;
 	}
-
 
 	public IcyBufferedImage subtractImages (IcyBufferedImage image1, IcyBufferedImage image2) 
 	{

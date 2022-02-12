@@ -9,6 +9,8 @@ import icy.file.Loader;
 import icy.file.SequenceFileImporter;
 import icy.gui.dialog.LoaderDialog;
 import icy.gui.dialog.MessageDialog;
+import icy.gui.viewer.Viewer;
+import icy.main.Icy;
 import icy.sequence.Sequence;
 import ome.xml.meta.OMEXMLMetadata;
 import plugins.fmp.fmpTools.StringSorter;
@@ -17,9 +19,9 @@ import plugins.stef.importer.xuggler.VideoImporter;
 public class OpenVirtualSequence {
 	
 	public static EnumStatus statusSequence = EnumStatus.REGULAR;
-	protected static VideoImporter importer 		= null;
-	private final static String[] acceptedTypes = {".jpg", ".jpeg", ".bmp", "tiff"};
-	private String directory 		= null;
+	protected static VideoImporter importer = null;
+	private static final String[] acceptedTypes = {".jpg", ".jpeg", ".bmp", "tiff"};
+	private String directory  = null;
 	/*
 	public SequenceVirtual (String csFile) 
 	{
@@ -32,8 +34,20 @@ public class OpenVirtualSequence {
 		filename = directory + ".xml";
 	}
 	*/
+	public static SequenceVirtual initVirtualSequence(Sequence seq) 
+	{
+		if (seq == null)
+			return null;
+		
+		Viewer v = seq.getFirstViewer();
+		if (v != null) 
+			v.close();
+		Icy.getMainInterface().addSequence(seq);
+		
+		return new SequenceVirtual(seq);
+	}
 	
-	static public Sequence openImagesOrAvi(String path) 
+	public static Sequence openImagesOrAvi(String path) 
 	{
 		LoaderDialog dialog = new LoaderDialog(false);
 		if (path != null) 

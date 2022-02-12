@@ -122,7 +122,7 @@ public class RoiToRoiArray extends EzPlug implements ViewerListener
 				}});
 		ezFindLinesButton = new EzButton("Build histograms",  new ActionListener() { 
 			public void actionPerformed(ActionEvent e) { 
-				initVirtualSequence();
+				virtualSequence = OpenVirtualSequence.initVirtualSequence(ezSequence.getValue());
 				findLines(); 
 				}});
 		ezOpenFileButton = new EzButton("Open file or sequence",  new ActionListener() 
@@ -200,17 +200,6 @@ public class RoiToRoiArray extends EzPlug implements ViewerListener
 		super.addEzComponent (outputParameters);
 	}
 	
-	private void initVirtualSequence() 
-	{
-		Sequence seq = ezSequence.getValue();
-		if (seq == null || virtualSequence != null)
-			return;
-		
-		virtualSequence = new SequenceVirtual(seq);
-		seq.getFirstViewer().close();
-		Icy.getMainInterface().addSequence(virtualSequence.seq);
-	}
-	
 	private void findLines() 
 	{
 		Sequence seq = ezSequence.getValue(true);
@@ -231,7 +220,7 @@ public class RoiToRoiArray extends EzPlug implements ViewerListener
 	private double [][] getProfile (Line2D line) 
 	{
 		List<Point2D> pointslist = getAllPointsAlongLine (line);		
-		IcyBufferedImage image = virtualSequence.loadVImage(virtualSequence.currentFrame);
+		IcyBufferedImage image = virtualSequence.seq.getImage(virtualSequence.currentFrame, 0);
 		double [][] profile = getValueForPointList(pointslist, image);
 		return profile;
 	}
@@ -335,7 +324,7 @@ public class RoiToRoiArray extends EzPlug implements ViewerListener
 		
 		for (int chan= 0; chan< 3; chan++) 
 		{
-			IcyBufferedImage virtualImage = virtualSequence.getImage(virtualSequence.currentFrame, 0, chan) ;
+			IcyBufferedImage virtualImage = virtualSequence.seq.getImage(virtualSequence.currentFrame, 0, chan) ;
 			if (virtualImage == null) 
 			{
 				System.out.println("An error occurred while reading image: " + virtualSequence.currentFrame );
@@ -987,17 +976,25 @@ public class RoiToRoiArray extends EzPlug implements ViewerListener
 	{
 		if (virtualSequence != null) 
 			virtualSequence.close();
-
-		SequenceVirtual virtualSequence = new SequenceVirtual();
-		virtualSequence.seq = OpenVirtualSequence.openImagesOrAvi(null);
+		
+		Sequence seq = OpenVirtualSequence.openImagesOrAvi(null);
+		virtualSequence = OpenVirtualSequence.initVirtualSequence(seq);
 		String path = virtualSequence.getDirectory();
 		if (path != null) 
 		{
 			XMLPreferences guiPrefs = this.getPreferences("gui");
 			guiPrefs.put("lastUsedPath", path);
-			
-			initInputSeq();
 		}
+		addSequenceToEzSequenceCombo(seq);
+	}
+	
+	private void addSequenceToEzSequenceCombo (Sequence seq) 
+	{
+//		addSequence(seq);
+		ezSequence.setValue(seq);
+		Viewer v = seq.getFirstViewer();
+		v.addListener(RoiToRoiArray.this);
+//		virtualSequence.seq.removeAllImages();
 	}
 	
 	// ----------------------------------
@@ -1155,16 +1152,6 @@ public class RoiToRoiArray extends EzPlug implements ViewerListener
 		{
 			createROISFromSelectedPolygon(2);
 		}		
-	}
-	
-	private void initInputSeq () 
-	{
-		addSequence(virtualSequence.seq);
-		ezSequence.setValue(virtualSequence.seq);
-		Viewer v = virtualSequence.seq.getFirstViewer();
-		v.addListener(RoiToRoiArray.this);
-
-		virtualSequence.seq.removeAllImages();
 	}
 	
 	@Override
