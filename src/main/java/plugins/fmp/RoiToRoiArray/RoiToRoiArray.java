@@ -64,9 +64,7 @@ public class RoiToRoiArray extends EzPlug implements ViewerListener, FoldListene
 	EzGroup groupDetectDisks;
 	
 	private SequenceVirtual sequenceVirtual = null;
-	private boolean stdFolding = false;
-	private boolean manualFolding = true;
-	private boolean disksFolding = true;
+	private boolean [] foldingStatus = new boolean[3];
 	
 	// ----------------------------------
 	
@@ -87,7 +85,7 @@ public class RoiToRoiArray extends EzPlug implements ViewerListener, FoldListene
 		rowInterval 		= new EzVarInteger("space btw. row ", 0, 0, 1000, 1);
 		areaShrink			= new EzVarInteger("area shrink (%)", 5, -100, 100, 1);
 		
-		adjustAndCenterEllipsesButton = new EzButton("Find leaf disks", new ActionListener() { 
+		adjustAndCenterEllipsesButton = new EzButton("Find leaf status[1]", new ActionListener() { 
 			public void actionPerformed(ActionEvent e) { 
 				DetectLeafDisks.findLeafDiskIntoRectangles(sequenceVirtual); 
 				}});
@@ -97,8 +95,7 @@ public class RoiToRoiArray extends EzPlug implements ViewerListener, FoldListene
 				Sequence seq = ezSequence.getValue();
 				DetectLinesSTD.findLines(seq, sequenceVirtual.currentFrame); 
 				}});
-		ezOpenFileButton = new EzButton("Open file or sequence",  new ActionListener() 
-		{ 
+		ezOpenFileButton = new EzButton("Open file or sequence",  new ActionListener() { 
 			public void actionPerformed(ActionEvent e) { 
 				openFile(); 
 				}});
@@ -164,20 +161,23 @@ public class RoiToRoiArray extends EzPlug implements ViewerListener, FoldListene
 				thresholdSTD, thresholdSTDFromChanComboBox, generateAutoGridButton, 
 				areaShrink, convertLinesToSquaresButton);
 		super.addEzComponent (groupDetectFromSTD);
-		groupDetectFromSTD.setFoldedState(stdFolding);
+		foldingStatus[0] = false;
+		groupDetectFromSTD.setFoldedState(foldingStatus[0]);
 		groupDetectFromSTD.addFoldListener(this);
 	
 		groupDefineManually = new EzGroup("Define lines manually", splitAsComboBox, 
 				ezNumberOfColumns, columnSize, columnSpan, 
 				ezNumberOfRows, rowWidth, rowInterval, generateGridButton);
 		super.addEzComponent (groupDefineManually);
-		groupDefineManually.setFoldedState(manualFolding);
+		foldingStatus[1] = true;
+		groupDefineManually.setFoldedState(foldingStatus[1]);
 		groupDefineManually.addFoldListener(this);
 
-		groupDetectDisks = new EzGroup("Detect leaf disks", 
+		groupDetectDisks = new EzGroup("Detect leaf status[1]", 
 				filterComboBox, thresholdOv, adjustAndCenterEllipsesButton);
 		super.addEzComponent (groupDetectDisks);
-		groupDetectDisks.setFoldedState(disksFolding);
+		foldingStatus[2] = true;
+		groupDetectDisks.setFoldedState(foldingStatus[2]);
 		groupDetectDisks.addFoldListener(this);
 		
 		EzGroup outputParameters = new EzGroup("Output data",  ezRootnameComboBox, changeGridNameButton, saveXMLButton);
@@ -293,39 +293,40 @@ public class RoiToRoiArray extends EzPlug implements ViewerListener, FoldListene
 
 	@Override
 	public void foldStateChanged(boolean state) {
-		boolean std = groupDetectFromSTD.getFoldedState();
-		boolean manual = groupDefineManually.getFoldedState();
-		boolean disks = groupDetectDisks.getFoldedState();
-		if (!std && std != stdFolding) { 
-			disks = true;
-			manual = true;
-		}
 		
-		if (!manual && manual != manualFolding) { 
-			disks = true;
-			std = true;
-		}
+		boolean [] status = new boolean [3];
+		status[0] = groupDetectFromSTD.getFoldedState();
+		status[1] = groupDefineManually.getFoldedState();
+		status[2] = groupDetectDisks.getFoldedState();
 		
-		if (!disks) 
-		{
-			std = true;
-			manual = true;
-		}
-		
-		foldGroups (std, manual, disks);
+		makeSureOnlyOneGroupIsUnfolded(status, foldingStatus);
+		foldGroups (status);
 		
 		int threshold = thresholdOv.getValue();
-		DetectLeafDisks.displayOverlay(sequenceVirtual, !disksFolding, threshold);
+		DetectLeafDisks.displayOverlay(sequenceVirtual, !foldingStatus[2], threshold);
 	}
 	
-	private void foldGroups(boolean std, boolean manual, boolean disks) {
-		stdFolding = std;
-		manualFolding = manual;
-		disksFolding = disks;
+	private void foldGroups(boolean [] status) {
+		foldingStatus[0] = status[0];
+		foldingStatus[1] = status[1];
+		foldingStatus[2] = status[2];
 		
-		groupDetectFromSTD.setFoldedState(std);
-		groupDefineManually.setFoldedState(manual);
-		groupDetectDisks.setFoldedState(disks);
+		groupDetectFromSTD.setFoldedState(status[0]);
+		groupDefineManually.setFoldedState(status[1]);
+		groupDetectDisks.setFoldedState(status[2]);
 	}
+	
+	private void makeSureOnlyOneGroupIsUnfolded(boolean [] statusNew, boolean [] statusOld) {
+		int size = 3;
+		for (int i= 0; i < size; i++) {
+			if (!statusNew[i] && statusNew[i] != statusOld[i]) {
+				for (int j = 0; j < size; j++ ) {
+					if (j != i) statusNew[j] = true;
+				}
+			}
+		}
+	}
+	
+	
 }
 
