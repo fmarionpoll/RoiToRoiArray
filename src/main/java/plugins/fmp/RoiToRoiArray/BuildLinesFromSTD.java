@@ -19,6 +19,7 @@ import org.jfree.chart.plot.PlotOrientation;
 import org.jfree.data.xy.XYSeries;
 import org.jfree.data.xy.XYSeriesCollection;
 
+import icy.gui.frame.IcyFrame;
 import icy.gui.frame.progress.AnnounceFrame;
 import icy.gui.util.GuiUtil;
 import icy.gui.viewer.Viewer;
@@ -31,10 +32,11 @@ import plugins.kernel.roi.roi2d.ROI2DPolygon;
 
 public class BuildLinesFromSTD {
 	
-	private double [][] stdXArray = null;
-	private double [][] stdYArray = null;
+	private static double [][] stdXArray = null;
+	private static double [][] stdYArray = null;
+	private static IcyFrame mainChartFrame = null;
 	
-	public static void buildAutoGrid (Sequence seq, int t) 
+	public static void buildAutoGrid (Sequence seq, int t, String choice, int threshold) 
 	{
 		ROI2D roi = seq.getSelectedROI2D();
 		if ( ! ( roi instanceof ROI2DPolygon ) ) {
@@ -45,7 +47,7 @@ public class BuildLinesFromSTD {
 		seq.removeAllROI();
 		seq.addROI(roi, true);
 		int channel = 0;
-		String choice = thresholdSTDFromChanComboBox.getValue();
+		
 		if (choice.contains("R+B-2G"))
 			channel = 3;
 		else if (choice.contains("R"))
@@ -59,12 +61,14 @@ public class BuildLinesFromSTD {
 		//buildROIsFromSTDProfile( roiPolygon, thresholdSTD.getValue(), channel);
 		
 		IcyBufferedImage image = seq.getImage(t, 0);
-		List<List<Line2D>> linesArray = lineTools.buildLinesFromSTDProfile(image, roiPolygon, stdXArray, stdYArray, thresholdSTD.getValue(), channel);
+		List<List<Line2D>> linesArray = lineTools.buildLinesFromSTDProfile(
+				image, roiPolygon, 
+				stdXArray, stdYArray, threshold, channel);
 		lineTools.buildROIsFromLines(seq, linesArray);
 		//expandROIsToMinima(0);
 	}
 	
-	public void findLines(Sequence seq) 
+	public static void findLines(Sequence seq, int t) 
 	{
 		ROI2D roi = seq.getSelectedROI2D();
 		if ( ! ( roi instanceof ROI2DPolygon ) ) {
@@ -75,12 +79,12 @@ public class BuildLinesFromSTD {
 		seq.removeAllROI();
 		seq.addROI(roi, true);
 
-		getSTD(roiPolygon.getBounds());
+		getSTD(seq, t, roiPolygon.getBounds());
 		getSTDRBminus2G();
-		graphDisplay2Panels(stdXArray, stdYArray);
+		graphDisplay2Panels(seq, stdXArray, stdYArray);
 	}
 	
-	private void getSTDRBminus2G() 
+	private static void getSTDRBminus2G() 
 	{
 		for (int i=0; i < stdXArray.length; i++) 
 			stdXArray[i][3] = stdXArray [i][0]+stdXArray[i][2]-2*stdXArray[i][1];
@@ -89,7 +93,7 @@ public class BuildLinesFromSTD {
 			stdYArray[i][3] = stdYArray[i][0]+stdYArray[i][2]-2*stdYArray[i][1];	
 	}
 	
-	public void getSTD (Rectangle rect) 
+	public static void getSTD (Sequence seq, int t, Rectangle rect) 
 	{
 		Point2D.Double [] refpoint = new Point2D.Double [4];
 		refpoint [0] = new Point2D.Double (rect.x, 					rect.y);
@@ -110,10 +114,10 @@ public class BuildLinesFromSTD {
 		
 		for (int chan= 0; chan< 3; chan++) 
 		{
-			IcyBufferedImage virtualImage = virtualSequence.seq.getImage(virtualSequence.currentFrame, 0, chan) ;
+			IcyBufferedImage virtualImage = seq.getImage(t, 0, chan) ;
 			if (virtualImage == null) 
 			{
-				System.out.println("An error occurred while reading image: " + virtualSequence.currentFrame );
+				System.out.println("An error occurred while reading image: " + t );
 				return;
 			}
 			int widthImage = virtualImage.getSizeX();
@@ -170,7 +174,7 @@ public class BuildLinesFromSTD {
 		}
 	}
 	
-	private void graphDisplay2Panels (double [][] arrayX, double [][] arrayY) 
+	private static void graphDisplay2Panels (Sequence seq, double [][] arrayX, double [][] arrayY) 
 	{
 		if (mainChartFrame != null) {
 			mainChartFrame.removeAll();
@@ -206,7 +210,7 @@ public class BuildLinesFromSTD {
 
 		mainChartFrame.add(mainPanel);
 		mainChartFrame.pack();
-		Viewer v = virtualSequence.seq.getFirstViewer();
+		Viewer v = seq.getFirstViewer();
 		Rectangle rectv = v.getBounds();
 		Point pt = new Point((int) rectv.getX(), (int) rectv.getY()+30);
 		mainChartFrame.setLocation(pt);
@@ -216,7 +220,7 @@ public class BuildLinesFromSTD {
 		mainChartFrame.requestFocus();
 	}
 	
-	private XYSeriesCollection graphCreateXYDataSet(double [][] array, String rootName) 
+	private static XYSeriesCollection graphCreateXYDataSet(double [][] array, String rootName) 
 	{
 		XYSeriesCollection xyDataset = new XYSeriesCollection();
 		for (int chan = 0; chan < 4; chan++) 

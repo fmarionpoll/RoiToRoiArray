@@ -93,8 +93,6 @@ public class RoiToRoiArray extends EzPlug implements ViewerListener
 	
 	private OverlayThreshold thresholdOverlay = null;
 	private SequenceVirtual virtualSequence = null;
-	private IcyFrame mainChartFrame = null;
-
 	
 	// ----------------------------------
 	
@@ -123,7 +121,7 @@ public class RoiToRoiArray extends EzPlug implements ViewerListener
 			public void actionPerformed(ActionEvent e) { 
 				virtualSequence = OpenVirtualSequence.initVirtualSequence(ezSequence.getValue());
 				Sequence seq = ezSequence.getValue();
-				BuildLinesFromSTD.findLines(seq); 
+				BuildLinesFromSTD.findLines(seq, virtualSequence.currentFrame); 
 				}});
 		ezOpenFileButton = new EzButton("Open file or sequence",  new ActionListener() 
 		{ 
@@ -146,7 +144,9 @@ public class RoiToRoiArray extends EzPlug implements ViewerListener
 			public void actionPerformed(ActionEvent e) { 
 				Sequence seq = ezSequence.getValue();
 				int t = virtualSequence.currentFrame;
-				BuildLinesFromSTD.buildAutoGrid(seq, t); 
+				String choice = thresholdSTDFromChanComboBox.getValue();
+				int threshold = thresholdSTD.getValue();
+				BuildLinesFromSTD.buildAutoGrid(seq, t, choice, threshold); 
 				}});
 		convertLinesToSquaresButton = new EzButton("Convert lines to squares",  new ActionListener() { 
 			public void actionPerformed(ActionEvent e) { 
