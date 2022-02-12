@@ -20,7 +20,7 @@ import plugins.kernel.roi.roi2d.ROI2DEllipse;
 import plugins.kernel.roi.roi2d.ROI2DLine;
 import plugins.kernel.roi.roi2d.ROI2DPolygon;
 
-public class BuildROIsFromLines 
+public class DefineLinesManually 
 {
 	public Line2D adjustLine (IcyBufferedImage image, Line2D line, int checksize, int deltainside) 
 	{	

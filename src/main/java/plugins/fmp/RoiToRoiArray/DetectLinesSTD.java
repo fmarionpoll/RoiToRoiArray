@@ -30,7 +30,7 @@ import icy.type.collection.array.Array1DUtil;
 import plugins.fmp.fmpTools.FmpTools;
 import plugins.kernel.roi.roi2d.ROI2DPolygon;
 
-public class BuildLinesFromSTD {
+public class DetectLinesSTD {
 	
 	private static double [][] stdXArray = null;
 	private static double [][] stdYArray = null;
@@ -57,7 +57,7 @@ public class BuildLinesFromSTD {
 		else
 			channel = 2;
 		
-		BuildROIsFromLines lineTools = new BuildROIsFromLines();
+		DefineLinesManually lineTools = new DefineLinesManually();
 		//buildROIsFromSTDProfile( roiPolygon, thresholdSTD.getValue(), channel);
 		
 		IcyBufferedImage image = seq.getImage(t, 0);

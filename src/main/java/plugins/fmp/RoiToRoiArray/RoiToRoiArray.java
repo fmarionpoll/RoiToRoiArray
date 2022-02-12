@@ -1,70 +1,39 @@
 package plugins.fmp.RoiToRoiArray;
 
-import java.awt.Color;
-import java.awt.Dimension;
-import java.awt.Point;
-import java.awt.Polygon;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.awt.geom.Line2D;
-import java.awt.geom.Point2D;
-import java.awt.Rectangle;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
-import javax.swing.BoxLayout;
-import javax.swing.JPanel;
-
-import org.jfree.chart.ChartFactory;
-import org.jfree.chart.ChartPanel;
-import org.jfree.chart.JFreeChart;
-import org.jfree.chart.plot.PlotOrientation;
-import org.jfree.data.xy.XYSeries;
-import org.jfree.data.xy.XYSeriesCollection;
-
-import plugins.kernel.roi.roi2d.ROI2DLine;
-import plugins.kernel.roi.roi2d.ROI2DPolygon;
-import plugins.kernel.roi.roi2d.ROI2DEllipse;
-
-import icy.gui.frame.IcyFrame;
-import icy.gui.frame.progress.AnnounceFrame;
-import icy.gui.util.GuiUtil;
 import icy.gui.viewer.Viewer;
 import icy.gui.viewer.ViewerEvent;
 import icy.gui.viewer.ViewerListener;
-import icy.image.IcyBufferedImage;
-import icy.image.IcyBufferedImageUtil;
 import icy.main.Icy;
 import icy.plugin.PluginLauncher;
 import icy.plugin.PluginLoader;
 import icy.gui.viewer.ViewerEvent.ViewerEventType;
 import icy.preferences.XMLPreferences;
 import icy.roi.ROI;
-import icy.roi.ROI2D;
 import icy.sequence.DimensionId;
 import icy.sequence.Sequence;
-import icy.type.collection.array.Array1DUtil;
-import icy.type.geom.GeomUtil;
 
 import plugins.adufour.ezplug.EzButton;
 import plugins.adufour.ezplug.EzGroup;
+import plugins.adufour.ezplug.EzGroup.FoldListener;
 import plugins.adufour.ezplug.EzPlug;
 import plugins.adufour.ezplug.EzVar;
-import plugins.adufour.ezplug.EzVarBoolean;
 import plugins.adufour.ezplug.EzVarEnum;
 import plugins.adufour.ezplug.EzVarInteger;
 import plugins.adufour.ezplug.EzVarListener;
 import plugins.adufour.ezplug.EzVarSequence;
 import plugins.adufour.ezplug.EzVarText;
+
 import plugins.fmp.fmpSequence.OpenVirtualSequence;
 import plugins.fmp.fmpSequence.SequenceVirtual;
-import plugins.fmp.fmpTools.FmpTools;
 import plugins.fmp.fmpTools.EnumImageOp;
-import plugins.fmp.fmpTools.OverlayThreshold;
 
 
-public class RoiToRoiArray extends EzPlug implements ViewerListener 
+
+public class RoiToRoiArray extends EzPlug implements ViewerListener, FoldListener
 {
 	EzButton		ezOpenFileButton;
 	EzVarSequence   ezSequence;
@@ -79,7 +48,6 @@ public class RoiToRoiArray extends EzPlug implements ViewerListener
 	EzVarText 		splitAsComboBox;
 	EzVarText 		thresholdSTDFromChanComboBox;
 	EzButton		adjustAndCenterEllipsesButton;
-	EzVarBoolean 	overlayCheckBox;
 	EzVarEnum<EnumImageOp> filterComboBox;
 	EzVarInteger 	thresholdOv;
 	EzVarInteger 	thresholdSTD;
@@ -91,8 +59,14 @@ public class RoiToRoiArray extends EzPlug implements ViewerListener
 	EzVarInteger 	areaShrink;
 	EzButton		changeGridNameButton;
 	
-	private OverlayThreshold thresholdOverlay = null;
-	private SequenceVirtual virtualSequence = null;
+	EzGroup groupDetectFromSTD;
+	EzGroup groupDefineManually;
+	EzGroup groupDetectDisks;
+	
+	private SequenceVirtual sequenceVirtual = null;
+	private boolean stdFolding = false;
+	private boolean manualFolding = true;
+	private boolean disksFolding = true;
 	
 	// ----------------------------------
 	
@@ -115,13 +89,13 @@ public class RoiToRoiArray extends EzPlug implements ViewerListener
 		
 		adjustAndCenterEllipsesButton = new EzButton("Find leaf disks", new ActionListener() { 
 			public void actionPerformed(ActionEvent e) { 
-				findLeafDiskIntoRectangles(); 
+				DetectLeafDisks.findLeafDiskIntoRectangles(sequenceVirtual); 
 				}});
 		ezFindLinesButton = new EzButton("Build histograms",  new ActionListener() { 
 			public void actionPerformed(ActionEvent e) { 
-				virtualSequence = OpenVirtualSequence.initVirtualSequence(ezSequence.getValue());
+				sequenceVirtual = OpenVirtualSequence.initVirtualSequence(ezSequence.getValue());
 				Sequence seq = ezSequence.getValue();
-				BuildLinesFromSTD.findLines(seq, virtualSequence.currentFrame); 
+				DetectLinesSTD.findLines(seq, sequenceVirtual.currentFrame); 
 				}});
 		ezOpenFileButton = new EzButton("Open file or sequence",  new ActionListener() 
 		{ 
@@ -143,62 +117,68 @@ public class RoiToRoiArray extends EzPlug implements ViewerListener
 		generateAutoGridButton = new EzButton("Create lines / histograms > threshold",  new ActionListener() { 
 			public void actionPerformed(ActionEvent e) { 
 				Sequence seq = ezSequence.getValue();
-				int t = virtualSequence.currentFrame;
+				int t = sequenceVirtual.currentFrame;
 				String choice = thresholdSTDFromChanComboBox.getValue();
 				int threshold = thresholdSTD.getValue();
-				BuildLinesFromSTD.buildAutoGrid(seq, t, choice, threshold); 
+				DetectLinesSTD.buildAutoGrid(seq, t, choice, threshold); 
 				}});
 		convertLinesToSquaresButton = new EzButton("Convert lines to squares",  new ActionListener() { 
 			public void actionPerformed(ActionEvent e) { 
 				int areaShrinkPCT = areaShrink.getValue();
 				String rootname = ezRootnameComboBox.getValue();
-				BuildROIsFromLines.convertLinesToSquares(virtualSequence.seq, rootname, areaShrinkPCT); 
+				DefineLinesManually.convertLinesToSquares(sequenceVirtual.seq, rootname, areaShrinkPCT); 
 				}});
 		changeGridNameButton = new EzButton("Set names of ROIs", new ActionListener () {
 			public void actionPerformed(ActionEvent e) { 
 				changeGridName(); 
 				}});
-		overlayCheckBox = new EzVarBoolean("build from overlay", false);
-		overlayCheckBox.addVarChangeListener(new EzVarListener<Boolean>() {
-             @Override
-             public void variableChanged(EzVar<Boolean> source, Boolean newValue) {
-            	 displayOverlay(newValue);
-             }});
+//		overlayCheckBox = new EzVarBoolean("build from overlay", false);
+//		overlayCheckBox.addVarChangeListener(new EzVarListener<Boolean>() {
+//             @Override
+//             public void variableChanged(EzVar<Boolean> source, Boolean newValue) {
+//            	 DetectLeafDisks.displayOverlay(sequenceVirtual, newValue, thresholdOv);
+//             }});
 
 		filterComboBox = new EzVarEnum <EnumImageOp>("Filter as ", EnumImageOp.values(), 7);
 		filterComboBox.addVarChangeListener(new EzVarListener<EnumImageOp>() {
 			@Override
 			public void variableChanged(EzVar<EnumImageOp> source, EnumImageOp newOp) {
-				updateOverlay();
+				EnumImageOp transformop = filterComboBox.getValue();
+				DetectLeafDisks.updateOverlay(sequenceVirtual, transformop);
 				}});
 		
-		thresholdOv = new EzVarInteger("threshold ", 70, 1, 255, 10);
-		thresholdSTD = new EzVarInteger("threshold / selected filter", 500, 1, 10000, 10);
+		thresholdOv = new EzVarInteger("threshold ", 70, 1, 255, 1);
+		thresholdSTD = new EzVarInteger("threshold / selected filter", 500, 1, 10000, 1);
 		thresholdOv.addVarChangeListener(new EzVarListener<Integer>() {
             @Override
-            public void variableChanged(EzVar<Integer> source, Integer newValue) { updateThreshold(newValue); }
-        });
+            public void variableChanged(EzVar<Integer> source, Integer newValue) { 
+            	DetectLeafDisks.updateThreshold(sequenceVirtual, newValue); 
+            	}});
 
 		// 2) add variables to the interface
 
 		EzGroup groupSequence = new EzGroup("Source data", ezSequence, ezOpenFileButton, openXMLButton);
 		super.addEzComponent (groupSequence);
 
-		EzGroup groupAutoDetect = new EzGroup("Automatic detection from lines", ezFindLinesButton, /*exportSTDButton,*/ 
+		groupDetectFromSTD = new EzGroup("Detect lines using STD", ezFindLinesButton, /*exportSTDButton,*/ 
 				thresholdSTD, thresholdSTDFromChanComboBox, generateAutoGridButton, 
 				areaShrink, convertLinesToSquaresButton);
-		super.addEzComponent (groupAutoDetect);
+		super.addEzComponent (groupDetectFromSTD);
+		groupDetectFromSTD.setFoldedState(stdFolding);
+		groupDetectFromSTD.addFoldListener(this);
 	
-		EzGroup groupManualDetect = new EzGroup("Manual definition of lines", splitAsComboBox, 
+		groupDefineManually = new EzGroup("Define lines manually", splitAsComboBox, 
 				ezNumberOfColumns, columnSize, columnSpan, 
 				ezNumberOfRows, rowWidth, rowInterval, generateGridButton);
-		super.addEzComponent (groupManualDetect);
-		groupManualDetect.setFoldedState(true);
+		super.addEzComponent (groupDefineManually);
+		groupDefineManually.setFoldedState(manualFolding);
+		groupDefineManually.addFoldListener(this);
 
-		EzGroup groupDetectDisks = new EzGroup("Detect leaf disks", overlayCheckBox, 
+		groupDetectDisks = new EzGroup("Detect leaf disks", 
 				filterComboBox, thresholdOv, adjustAndCenterEllipsesButton);
 		super.addEzComponent (groupDetectDisks);
-		groupDetectDisks.setFoldedState(true);
+		groupDetectDisks.setFoldedState(disksFolding);
+		groupDetectDisks.addFoldListener(this);
 		
 		EzGroup outputParameters = new EzGroup("Output data",  ezRootnameComboBox, changeGridNameButton, saveXMLButton);
 		super.addEzComponent (outputParameters);
@@ -206,263 +186,14 @@ public class RoiToRoiArray extends EzPlug implements ViewerListener
 	
 // -----------------------------------	
 	
-	private void findLeafDiskIntoRectangles() {
-		if (!overlayCheckBox.getValue())
-			return;
-		if (virtualSequence.cacheThresholdedImage == null)
-			return;
-		// get byte image (0, 1) that has been thresholded
-		ArrayList<ROI2D> roiList = virtualSequence.seq.getROI2Ds();
-		Collections.sort(roiList, new FmpTools.ROI2DNameComparator());
-		
-		for (ROI2D roi:roiList) {
-			if (!roi.getName().contains("grid"))
-				continue;
-
-			Rectangle rectGrid = roi.getBounds();
-			IcyBufferedImage img = IcyBufferedImageUtil.getSubImage(virtualSequence.cacheThresholdedImage, rectGrid);
-			byte [] binaryData = img.getDataXYAsByte(0);
-			int sizeX = img.getSizeX();
-			int sizeY = img.getSizeY();
-
-			getPixelsConnected (sizeX, sizeY, binaryData);
-			getBlobsConnected(sizeX, sizeY, binaryData);
-			byte leafBlob = getLargestBlob(binaryData);
-			eraseAllBlobsExceptOne(leafBlob, binaryData);
-			Rectangle leafBlobRect = getBlobRectangle( leafBlob, sizeX, sizeY, binaryData);
-			
-			addLeafROIinGridRectangle(leafBlobRect, roi);
-		}
-		System.out.println("Done");
-	}
-	
-	private void addLeafROIinGridRectangle (Rectangle leafBlobRect, ROI2D roi) {
-
-		Rectangle rectGrid = roi.getBounds();
-		double xleft = rectGrid.getX()+ leafBlobRect.getX();
-		double xright = xleft + leafBlobRect.getWidth();
-		double ytop = rectGrid.getY() + leafBlobRect.getY();
-		double ybottom = ytop + leafBlobRect.getHeight();
-		
-		Point2D.Double point0 = new Point2D.Double (xleft , ytop);
-		Point2D.Double point1 = new Point2D.Double (xleft , ybottom);
-		Point2D.Double point2 = new Point2D.Double (xright , ybottom);
-		Point2D.Double point3 = new Point2D.Double (xright , ytop);
-		
-		List<Point2D> points = new ArrayList<>();
-		points.add(point0);
-		points.add(point1);
-		points.add(point2);
-		points.add(point3);
-		ROI2DEllipse roiP = new ROI2DEllipse (points.get(0), points.get(2));
-		roiP.setName("leaf"+roi.getName());
-		roiP.setColor(Color.RED);
-		ezSequence.getValue(true).addROI(roiP);
-	}
-	
-	private Rectangle getBlobRectangle(byte blobNumber, int sizeX, int sizeY, byte [] binaryData) {
-		Rectangle rect = new Rectangle(0, 0, 0, 0);
-		int [] arrayX = new int [sizeX];
-		int [] arrayY = new int [sizeY];
-		for (int iy= 0; iy < sizeY; iy++) {
-			for (int ix = 0; ix < sizeX; ix++) {					
-				if (binaryData[ix + sizeX*iy] != blobNumber) 
-					continue;
-				arrayX[ix] ++;
-				arrayY[iy]++;
-			}
-		}
-		for (int i=0; i< sizeX; i++)
-			if (arrayX[i] > 0) {
-				rect.x = i;
-				break;
-			}
-		for (int i = sizeX-1; i >=0; i--)
-			if (arrayX[i] > 0) {
-				rect.width = i-rect.x +1;
-				break;
-			}
-		
-		for (int i=0; i< sizeY; i++)
-			if (arrayY[i] > 0) {
-				rect.y = i;
-				break;
-			}
-		for (int i = sizeY-1; i >=0; i--)
-			if (arrayY[i] > 0) {
-				rect.height = i-rect.y +1;
-				break;
-			}
-		return rect;
-	}
-	
-	private int getPixelsConnected (int sizeX, int sizeY, byte [] binaryData) 
-	{
-		byte blobnumber = 1;
-		for (int iy= 0; iy < sizeY; iy++) {
-			for (int ix = 0; ix < sizeX; ix++) {					
-				if (binaryData[ix + sizeX*iy] < 0) 
-					continue;
-				
-				int ioffset = ix + sizeX*iy;
-				int ioffsetpreviousrow = ix + sizeX*(iy-1);
-				
-				if ((iy > 0) && (ix > 0) && (binaryData[ioffsetpreviousrow-1] > 0)) 
-					binaryData[ioffset] = binaryData[ioffsetpreviousrow-1];
-				
-				else if ((iy > 0) && (binaryData[ioffsetpreviousrow] > 0))
-					binaryData[ioffset] = binaryData[ioffsetpreviousrow];
-				
-				else if ((iy > 0) && ((ix+1) < sizeX) &&  (binaryData[ioffsetpreviousrow+1] > 0))
-					binaryData[ioffset] = binaryData[ioffsetpreviousrow+1];
-				
-				else if ((ix > 0) && (binaryData[ioffset-1] > 0))
-					binaryData[ioffset] = binaryData[ioffset-1];
-				
-				else { // new blob number
-					binaryData[ioffset] = blobnumber;
-					blobnumber++;
-				}						
-			}
-		}
-		return (int) blobnumber -1;
-	}
-	
-	private void getBlobsConnected (int sizeX, int sizeY, byte[] binaryData) {
-		for (int iy= 0; iy < sizeY; iy++) {
-			for (int ix = 0; ix < sizeX; ix++) {					
-				if (binaryData[ix + sizeX*iy] < 0) 
-					continue;
-				
-				int ioffset = ix + sizeX*iy;
-				int ioffsetpreviousrow = ix + sizeX*(iy-1);
-				byte val = binaryData[ioffset];
-				
-				if ((iy > 0) && (ix > 0) && (binaryData[ioffsetpreviousrow-1] > 0)) 
-					if (binaryData[ioffsetpreviousrow-1] > val)
-						changeAllBlobNumber1Into2 (binaryData[ioffsetpreviousrow-1], val, binaryData) ;
-				
-				else if ((iy > 0) && (binaryData[ioffsetpreviousrow] > 0))
-					if (binaryData[ioffsetpreviousrow] > val)
-						changeAllBlobNumber1Into2 (binaryData[ioffsetpreviousrow], val, binaryData) ;
-				
-				else if ((iy > 0) && ((ix+1) < sizeX) &&  (binaryData[ioffsetpreviousrow+1] > 0))
-					if (binaryData[ioffsetpreviousrow+1] > val)
-						changeAllBlobNumber1Into2 (binaryData[ioffsetpreviousrow+1], val, binaryData) ;
-				
-				else if ((ix>0) && (binaryData[ioffset-1] > 0))
-					if (binaryData[ioffset-1] > val)
-						changeAllBlobNumber1Into2 (binaryData[ioffset-1], val, binaryData) ;					
-			}
-		}
-	}
-	
-	private byte getLargestBlob(byte[] binaryData) 
-	{
-		byte maxblob = getMaximumBlobNumber(binaryData);
-		int maxpixels = 0;
-		byte largestblob = 0;
-		for (byte i=0; i <= maxblob; i++) {
-			int npixels = getNumberOfPixelEqualToValue (i, binaryData);
-			if (npixels > maxpixels) {
-				maxpixels = npixels;
-				largestblob = i;
-			}
-		}
-		return largestblob;
-	}
-	
-	private void eraseAllBlobsExceptOne(byte blobIDToKeep, byte [] binaryData) {
-		for (int i=0; i< binaryData.length; i++) {
-			if (binaryData[i] != blobIDToKeep)
-				binaryData[i] = -1;
-			else
-				binaryData[i] = 1;
-		}
-	}
-	
-	private void changeAllBlobNumber1Into2 (byte oldvalue, byte newvalue, byte [] binaryData) 
-	{
-		for (int i=0; i< binaryData.length; i++)
-			if (binaryData[i] == oldvalue)
-				binaryData[i] = newvalue;
-	}
-	
-	private int getNumberOfPixelEqualToValue (byte value, byte [] binaryData) 
-	{
-		int sum = 0;
-		for (int i=0; i< binaryData.length; i++)
-			if (binaryData[i] == value)
-				sum++;
-		return sum;
-	}
-	
-	private byte getMaximumBlobNumber (byte [] binaryData) 
-	{
-		byte max = 0;
-		for (int i=0; i< binaryData.length; i++)
-			if (binaryData[i] > max)
-				max = binaryData[i];
-		return max;
-	}
-	
-	private void displayOverlay (Boolean newValue) {
-		if (virtualSequence == null)
-			return;
-
-		if (newValue) {
-			
-			if (thresholdOverlay == null) {
-				thresholdOverlay = new OverlayThreshold(virtualSequence);
-				virtualSequence.seq.addOverlay(thresholdOverlay);
-			}
-			virtualSequence.cagesRoi2RoiArray.detect.threshold = thresholdOv.getValue();
-			virtualSequence.seq.addOverlay(thresholdOverlay);
-			updateOverlay();
-		}
-		else  {
-			if (virtualSequence == null)
-				return;
-			if (thresholdOverlay != null) 
-				virtualSequence.seq.removeOverlay(thresholdOverlay);
-			thresholdOverlay = null;
-		}
-	}
-	
-	private void updateThreshold (int newValue) {
-		if (virtualSequence == null)
-			return;
-		
-		virtualSequence.cagesRoi2RoiArray.detect.threshold = thresholdOv.getValue();
-		updateOverlay();
-	}
-	
-	private void updateOverlay () {
-		if (virtualSequence == null)
-			return;
-		if (thresholdOverlay == null) {
-			thresholdOverlay = new OverlayThreshold(virtualSequence);
-			virtualSequence.seq.addOverlay(thresholdOverlay);
-		}
-		EnumImageOp transformop = filterComboBox.getValue();
-
-		thresholdOverlay.setSequence (virtualSequence);
-		thresholdOverlay.setTransform(transformop);
-		thresholdOverlay.setThresholdSingle(virtualSequence.cagesRoi2RoiArray.detect.threshold);
-			
-		if (thresholdOverlay != null) {
-			thresholdOverlay.painterChanged();
-		}
-	}
-	
 	private void openFile() 
 	{
-		if (virtualSequence != null) 
-			virtualSequence.close();
+		if (sequenceVirtual != null) 
+			sequenceVirtual.close();
 		
 		Sequence seq = OpenVirtualSequence.openImagesOrAvi(null);
-		virtualSequence = OpenVirtualSequence.initVirtualSequence(seq);
-		String path = virtualSequence.getDirectory();
+		sequenceVirtual = OpenVirtualSequence.initVirtualSequence(seq);
+		String path = sequenceVirtual.getDirectory();
 		if (path != null) 
 		{
 			XMLPreferences guiPrefs = this.getPreferences("gui");
@@ -502,15 +233,15 @@ public class RoiToRoiArray extends EzPlug implements ViewerListener
 		
 		if (choice == "vertical lines") 
 		{
-			BuildROIsFromLines.createROISFromSelectedPolygon(seq, 0, rootName, colSpan, colSize, nbcols, rowSpan, rowSize, nbrows);
+			DefineLinesManually.createROISFromSelectedPolygon(seq, 0, rootName, colSpan, colSize, nbcols, rowSpan, rowSize, nbrows);
 		}
 		else if (choice == "polygons") 
 		{
-			BuildROIsFromLines.createROISFromSelectedPolygon(seq, 1, rootName, colSpan, colSize, nbcols, rowSpan, rowSize, nbrows);
+			DefineLinesManually.createROISFromSelectedPolygon(seq, 1, rootName, colSpan, colSize, nbcols, rowSpan, rowSize, nbrows);
 		}
 		else if (choice == "circles") 
 		{
-			BuildROIsFromLines.createROISFromSelectedPolygon(seq, 2, rootName, colSpan, colSize, nbcols, rowSpan, rowSize, nbrows);
+			DefineLinesManually.createROISFromSelectedPolygon(seq, 2, rootName, colSpan, colSize, nbcols, rowSpan, rowSize, nbrows);
 		}		
 	}
 	
@@ -518,32 +249,32 @@ public class RoiToRoiArray extends EzPlug implements ViewerListener
 	public void viewerChanged(ViewerEvent event) 
 	{
 		if ((event.getType() == ViewerEventType.POSITION_CHANGED) && (event.getDim() == DimensionId.T))        
-			virtualSequence.currentFrame = event.getSource().getPositionT() ; 
+			sequenceVirtual.currentFrame = event.getSource().getPositionT() ; 
 	}
 	
 	@Override
 	public void viewerClosed(Viewer viewer) 
 	{
 		viewer.removeListener(this);
-		virtualSequence = null;
+		sequenceVirtual = null;
 	}
 	
 	private void openXMLFile() 
 	{
-		virtualSequence.seq.removeAllROI();
-		virtualSequence.capillariesRoi2RoiArray.xmlReadROIsAndData(virtualSequence);
+		sequenceVirtual.seq.removeAllROI();
+		sequenceVirtual.capillariesRoi2RoiArray.xmlReadROIsAndData(sequenceVirtual);
 //		vSequence.cages.xmlReadCagesFromFile(vSequence);
 	}
 	
 	private void saveXMLFile() 
 	{
-		virtualSequence.capillariesRoi2RoiArray.grouping = 1;
-		virtualSequence.capillariesRoi2RoiArray.xmlWriteROIsAndDataNoFilter("roisarray.xml", virtualSequence);
+		sequenceVirtual.capillariesRoi2RoiArray.grouping = 1;
+		sequenceVirtual.capillariesRoi2RoiArray.xmlWriteROIsAndDataNoFilter("roisarray.xml", sequenceVirtual);
 	}
 	
 	private void changeGridName() 
 	{
-		List<ROI> roisList = virtualSequence.seq.getROIs(true);
+		List<ROI> roisList = sequenceVirtual.seq.getROIs(true);
 		String baseName = ezRootnameComboBox.getValue();
 		
 		for (ROI roi : roisList) {
@@ -558,6 +289,43 @@ public class RoiToRoiArray extends EzPlug implements ViewerListener
 	{
 		Icy.main(args);
 		PluginLauncher.start(PluginLoader.getPlugin(RoiToRoiArray.class.getName()));
+	}
+
+	@Override
+	public void foldStateChanged(boolean state) {
+		boolean std = groupDetectFromSTD.getFoldedState();
+		boolean manual = groupDefineManually.getFoldedState();
+		boolean disks = groupDetectDisks.getFoldedState();
+		if (!std && std != stdFolding) { 
+			disks = true;
+			manual = true;
+		}
+		
+		if (!manual && manual != manualFolding) { 
+			disks = true;
+			std = true;
+		}
+		
+		if (!disks) 
+		{
+			std = true;
+			manual = true;
+		}
+		
+		foldGroups (std, manual, disks);
+		
+		int threshold = thresholdOv.getValue();
+		DetectLeafDisks.displayOverlay(sequenceVirtual, !disksFolding, threshold);
+	}
+	
+	private void foldGroups(boolean std, boolean manual, boolean disks) {
+		stdFolding = std;
+		manualFolding = manual;
+		disksFolding = disks;
+		
+		groupDetectFromSTD.setFoldedState(std);
+		groupDefineManually.setFoldedState(manual);
+		groupDetectDisks.setFoldedState(disks);
 	}
 }
 
