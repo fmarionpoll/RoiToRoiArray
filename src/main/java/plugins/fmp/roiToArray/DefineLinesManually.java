@@ -1,4 +1,4 @@
-package plugins.fmp.RoiToRoiArray;
+package plugins.fmp.roiToArray;
 
 import java.awt.Color;
 import java.awt.Polygon;

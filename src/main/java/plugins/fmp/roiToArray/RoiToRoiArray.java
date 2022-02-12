@@ -1,4 +1,4 @@
-package plugins.fmp.RoiToRoiArray;
+package plugins.fmp.roiToArray;
 
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
