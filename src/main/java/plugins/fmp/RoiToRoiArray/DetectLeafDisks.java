@@ -78,8 +78,10 @@ public class DetectLeafDisks {
 		Rectangle rect = new Rectangle(0, 0, 0, 0);
 		int [] arrayX = new int [sizeX];
 		int [] arrayY = new int [sizeY];
-		for (int iy= 0; iy < sizeY; iy++) {
-			for (int ix = 0; ix < sizeX; ix++) {					
+		for (int iy= 0; iy < sizeY; iy++) 
+		{
+			for (int ix = 0; ix < sizeX; ix++) 
+			{					
 				if (binaryData[ix + sizeX*iy] != blobNumber) 
 					continue;
 				arrayX[ix] ++;
@@ -87,23 +89,27 @@ public class DetectLeafDisks {
 			}
 		}
 		for (int i=0; i< sizeX; i++)
-			if (arrayX[i] > 0) {
+			if (arrayX[i] > 0) 
+			{
 				rect.x = i;
 				break;
 			}
 		for (int i = sizeX-1; i >=0; i--)
-			if (arrayX[i] > 0) {
+			if (arrayX[i] > 0) 
+			{
 				rect.width = i-rect.x +1;
 				break;
 			}
 		
 		for (int i=0; i< sizeY; i++)
-			if (arrayY[i] > 0) {
+			if (arrayY[i] > 0) 
+			{
 				rect.y = i;
 				break;
 			}
 		for (int i = sizeY-1; i >=0; i--)
-			if (arrayY[i] > 0) {
+			if (arrayY[i] > 0) 
+			{
 				rect.height = i-rect.y +1;
 				break;
 			}
@@ -113,8 +119,10 @@ public class DetectLeafDisks {
 	private static int getPixelsConnected (int sizeX, int sizeY, byte [] binaryData) 
 	{
 		byte blobnumber = 1;
-		for (int iy= 0; iy < sizeY; iy++) {
-			for (int ix = 0; ix < sizeX; ix++) {					
+		for (int iy= 0; iy < sizeY; iy++) 
+		{
+			for (int ix = 0; ix < sizeX; ix++) 
+			{					
 				if (binaryData[ix + sizeX*iy] < 0) 
 					continue;
 				
@@ -143,8 +151,10 @@ public class DetectLeafDisks {
 	}
 	
 	private static void getBlobsConnected (int sizeX, int sizeY, byte[] binaryData) {
-		for (int iy= 0; iy < sizeY; iy++) {
-			for (int ix = 0; ix < sizeX; ix++) {					
+		for (int iy= 0; iy < sizeY; iy++) 
+		{
+			for (int ix = 0; ix < sizeX; ix++) 
+			{					
 				if (binaryData[ix + sizeX*iy] < 0) 
 					continue;
 				

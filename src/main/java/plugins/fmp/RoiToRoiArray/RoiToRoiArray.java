@@ -85,7 +85,7 @@ public class RoiToRoiArray extends EzPlug implements ViewerListener, FoldListene
 		rowInterval 		= new EzVarInteger("space btw. row ", 0, 0, 1000, 1);
 		areaShrink			= new EzVarInteger("area shrink (%)", 5, -100, 100, 1);
 		
-		adjustAndCenterEllipsesButton = new EzButton("Find leaf status[1]", new ActionListener() { 
+		adjustAndCenterEllipsesButton = new EzButton("Find leaf disks within ROIs", new ActionListener() { 
 			public void actionPerformed(ActionEvent e) { 
 				DetectLeafDisks.findLeafDiskIntoRectangles(sequenceVirtual); 
 				}});
@@ -173,7 +173,7 @@ public class RoiToRoiArray extends EzPlug implements ViewerListener, FoldListene
 		groupDefineManually.setFoldedState(foldingStatus[1]);
 		groupDefineManually.addFoldListener(this);
 
-		groupDetectDisks = new EzGroup("Detect leaf status[1]", 
+		groupDetectDisks = new EzGroup("Detect leaf disks", 
 				filterComboBox, thresholdOv, adjustAndCenterEllipsesButton);
 		super.addEzComponent (groupDetectDisks);
 		foldingStatus[2] = true;
