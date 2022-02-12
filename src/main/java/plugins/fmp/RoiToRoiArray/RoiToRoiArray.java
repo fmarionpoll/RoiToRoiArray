@@ -94,8 +94,7 @@ public class RoiToRoiArray extends EzPlug implements ViewerListener
 	private OverlayThreshold thresholdOverlay = null;
 	private SequenceVirtual virtualSequence = null;
 	private IcyFrame mainChartFrame = null;
-	private double [][] stdXArray = null;
-	private double [][] stdYArray = null;
+
 	
 	// ----------------------------------
 	
@@ -123,7 +122,8 @@ public class RoiToRoiArray extends EzPlug implements ViewerListener
 		ezFindLinesButton = new EzButton("Build histograms",  new ActionListener() { 
 			public void actionPerformed(ActionEvent e) { 
 				virtualSequence = OpenVirtualSequence.initVirtualSequence(ezSequence.getValue());
-				findLines(); 
+				Sequence seq = ezSequence.getValue();
+				BuildLinesFromSTD.findLines(seq); 
 				}});
 		ezOpenFileButton = new EzButton("Open file or sequence",  new ActionListener() 
 		{ 
@@ -144,11 +144,15 @@ public class RoiToRoiArray extends EzPlug implements ViewerListener
 				}});
 		generateAutoGridButton = new EzButton("Create lines / histograms > threshold",  new ActionListener() { 
 			public void actionPerformed(ActionEvent e) { 
-				buildAutoGrid(); 
+				Sequence seq = ezSequence.getValue();
+				int t = virtualSequence.currentFrame;
+				BuildLinesFromSTD.buildAutoGrid(seq, t); 
 				}});
 		convertLinesToSquaresButton = new EzButton("Convert lines to squares",  new ActionListener() { 
 			public void actionPerformed(ActionEvent e) { 
-				convertLinesToSquares(); 
+				int areaShrinkPCT = areaShrink.getValue();
+				String rootname = ezRootnameComboBox.getValue();
+				BuildROIsFromLines.convertLinesToSquares(virtualSequence.seq, rootname, areaShrinkPCT); 
 				}});
 		changeGridNameButton = new EzButton("Set names of ROIs", new ActionListener () {
 			public void actionPerformed(ActionEvent e) { 
@@ -199,527 +203,6 @@ public class RoiToRoiArray extends EzPlug implements ViewerListener
 		EzGroup outputParameters = new EzGroup("Output data",  ezRootnameComboBox, changeGridNameButton, saveXMLButton);
 		super.addEzComponent (outputParameters);
 	}
-	
-	private void findLines() 
-	{
-		Sequence seq = ezSequence.getValue(true);
-		ROI2D roi = seq.getSelectedROI2D();
-		if ( ! ( roi instanceof ROI2DPolygon ) ) {
-			new AnnounceFrame("The frame must be a ROI2D POLYGON");
-			return;
-		}
-		Polygon roiPolygon = FmpTools.orderVerticesofPolygon (((ROI2DPolygon) roi).getPolygon());
-		seq.removeAllROI();
-		seq.addROI(roi, true);
-
-		getSTD(roiPolygon.getBounds());
-		getSTDRBminus2G();
-		graphDisplay2Panels(stdXArray, stdYArray);
-	}
-
-	private double [][] getProfile (Line2D line) 
-	{
-		List<Point2D> pointslist = getAllPointsAlongLine (line);		
-		IcyBufferedImage image = virtualSequence.seq.getImage(virtualSequence.currentFrame, 0);
-		double [][] profile = getValueForPointList(pointslist, image);
-		return profile;
-	}
-	
-	private List<Point2D> getAllPointsAlongLine(Line2D line) 
-	{
-        List<Point2D> pointslist = new ArrayList<Point2D>();
-        int x1 = (int) line.getX1();
-        int y1 = (int) line.getY1();
-        int x2 = (int) line.getX2();
-        int y2 = (int) line.getY2();
-        
-        int deltax = Math.abs(x2 - x1);
-        int deltay = Math.abs(y2 - y1);
-        int error = 0;
-        if (deltax > deltay) {
-	        int y = y1;
-	        for (int x = x1; x< x2; x++) 
-	        {
-	        	pointslist.add(new Point2D.Double(x, y));
-	        	error = error + deltay;
-	            if( 2*error >= deltax ) {
-	                y = y + 1;
-	                error=error - deltax;
-	            	}
-	        }
-        }
-        else 
-        {
-        	int x = x1;
-	        for (int y = y1; y< y2; y++) 
-	        {
-	        	pointslist.add(new Point2D.Double(x, y));
-	        	error = error + deltax;
-	            if( 2*error >= deltay ) {
-	                x = x + 1;
-	                error=error - deltay;
-	            	}
-	        }
-        }
-        return pointslist;
-	}
-	
-	public double[][] getValueForPointList( List<Point2D> pointList, IcyBufferedImage image ) 
-	{
-		int sizeX = image.getSizeX();
-		int sizeY = image.getSizeY();
-		
-		int nchannels = image.getSizeC();
-		int len = pointList.size();
-		double[][] value = new double[len][nchannels];
-//		System.out.println( "create double array len=" + len  + " nchannels="+ nchannels);
-		
-		for (int chan=0; chan < nchannels; chan++) {
-			double [] sourceValues = Array1DUtil.arrayToDoubleArray(image.getDataXY(chan), image.isSignedDataType());
-			int len_sourceValues = sourceValues.length -1;
-			//System.out.println("len = "+len_sourceValues);
-			for (int i=0; i<len; i++) {
-				Point2D point = pointList.get(i);
-				if (point.getX() < 0)
-					point.setLocation(0, point.getY());
-				if (point.getY() < 0)
-					point.setLocation(point.getX(), 0);
-//					System.out.println( "i= " + i  + " point x:"+ point.getX() + " point.y="+ point.getY());
-				if (point.getX() >= sizeX ) 
-					point.setLocation(sizeX -1, point.getY());
-				if (point.getX() >= sizeX || point.getY() >= sizeY) 
-					point.setLocation(point.getX(), sizeY -1);
-	
-				int index = (int)point.getX() + ((int) point.getY() * sizeX);
-				if (index >= len_sourceValues)
-					index = len_sourceValues -1;
-				if (index < 0) {
-					System.out.println( "i= " + i  + " point x:"+ point.getX() + " point.y="+ point.getY() + " index=" + index);
-				}
-
-				value[i][chan] = sourceValues [index];
-			}
-		}
-		return value;
-	}
-
-	private void getSTD (Rectangle rect) 
-	{
-		Point2D.Double [] refpoint = new Point2D.Double [4];
-		refpoint [0] = new Point2D.Double (rect.x, 					rect.y);
-		refpoint [1] = new Point2D.Double (rect.x, 					rect.y + rect.height - 1);
-		refpoint [2] = new Point2D.Double (rect.x + rect.width - 1, rect.y + rect.height - 1);
-		refpoint [3] = new Point2D.Double (rect.x + rect.width - 1, rect.y );
-		
-		int nYpoints = (int) (refpoint[1].y - refpoint[0].y +1); 
-		int nXpoints = (int) (refpoint[3].x - refpoint[0].x +1); 
-		double [][] sumXArray = new double [nXpoints][3];
-		double [][] sum2XArray = new double [nXpoints][3];
-		double [][] countXArray = new double [nXpoints][3];
-		stdXArray = new double [nXpoints][4];
-		double [][] sumYArray = new double [nYpoints][3];
-		double [][] sum2YArray = new double [nYpoints][3];
-		double [][] countYArray = new double [nYpoints][3];
-		stdYArray = new double [nYpoints][4];
-		
-		for (int chan= 0; chan< 3; chan++) 
-		{
-			IcyBufferedImage virtualImage = virtualSequence.seq.getImage(virtualSequence.currentFrame, 0, chan) ;
-			if (virtualImage == null) 
-			{
-				System.out.println("An error occurred while reading image: " + virtualSequence.currentFrame );
-				return;
-			}
-			int widthImage = virtualImage.getSizeX();
-			double [] image1DArray = Array1DUtil.arrayToDoubleArray(virtualImage.getDataXY(0), virtualImage.isSignedDataType());
-			
-			double deltaXUp 	= (refpoint[3].x - refpoint[0].x +1);
-			double deltaXDown 	= (refpoint[2].x - refpoint[1].x +1);
-			double deltaYUp 	= (refpoint[3].y - refpoint[0].y +1);
-			double deltaYDown 	= (refpoint[2].y - refpoint[1].y +1);
-			
-			for (int ix = 0; ix < nXpoints; ix++) {
-				
-				double xUp 		= refpoint[0].x + deltaXUp * ix / nXpoints;
-				double yUp 		= refpoint[0].y + deltaYUp * ix / nXpoints;
-				double xDown 	= refpoint[1].x + deltaXDown * ix / nXpoints;
-				double yDown 	= refpoint[1].y + deltaYDown * ix / nXpoints;
-
-				for (int iy = 0; iy < nYpoints; iy++) {
-					double x = xUp + (xDown - xUp +1) * iy / nYpoints;
-					double y = yUp + (yDown - yUp +1) * iy / nYpoints;
-					
-					int index = (int) x + ((int) y* widthImage);
-					double value = image1DArray[index];
-					double value2 = value*value;
-					
-					sumXArray[ix][chan] = sumXArray[ix][chan] + value;
-					sum2XArray[ix][chan] = sum2XArray[ix][chan] + value2;
-					countXArray[ix][chan] = countXArray[ix][chan] + 1;
-					
-					sumYArray[iy][chan] = sumYArray[iy][chan] + value;
-					sum2YArray[iy][chan] = sum2YArray[iy][chan] + value2;
-					countYArray[iy][chan] = countYArray[iy][chan] +1;
-				}
-			}
-		}
-		
-		// compute variance
-		for (int chan = 0; chan <3; chan++) {
-			for (int ix = 0; ix < nXpoints; ix++) {
-				double n 		= countXArray[ix][chan];
-				double sum2 	= sum2XArray[ix][chan];
-				double sumsum 	= sumXArray[ix][chan];
-				sumsum 			= sumsum*sumXArray[ix][chan]/n;
-				stdXArray[ix][chan] = (sum2 - sumsum)/(n-1);
-			}
-			
-			for (int iy = 0; iy < nYpoints; iy++) {
-				double n 		= countYArray[iy][chan];
-				double sum2 	= sum2YArray[iy][chan];
-				double sumsum 	= sumYArray[iy][chan];
-				sumsum 			= sumsum*sumYArray[iy][chan]/n;
-				stdYArray[iy][chan] = (sum2 - sumsum)/(n-1);
-			}
-		}
-	}
-
-	private void getSTDRBminus2G() 
-	{
-		for (int i=0; i < stdXArray.length; i++) 
-			stdXArray[i][3] = stdXArray [i][0]+stdXArray[i][2]-2*stdXArray[i][1];
-			
-		for (int i=0; i < stdYArray.length; i++) 
-			stdYArray[i][3] = stdYArray[i][0]+stdYArray[i][2]-2*stdYArray[i][1];	
-	}
-	
-	private XYSeriesCollection graphCreateXYDataSet(double [][] array, String rootName) 
-	{
-		XYSeriesCollection xyDataset = new XYSeriesCollection();
-		for (int chan = 0; chan < 4; chan++) 
-		{
-			XYSeries seriesXY = new XYSeries(rootName+chan);
-			if (chan == 3)
-				seriesXY.setDescription("1-2 + 3-2");
-			int len = array.length;
-			for ( int i = 0; i < len;  i++ )
-			{
-				double value = array[i][chan];
-				seriesXY.add( i, value);
-			}
-			xyDataset.addSeries(seriesXY );
-		}
-		return xyDataset;
-	}
-	
-	private void graphDisplay2Panels (double [][] arrayX, double [][] arrayY) 
-	{
-		if (mainChartFrame != null) {
-			mainChartFrame.removeAll();
-			mainChartFrame.close();
-		}
-
-		final JPanel mainPanel = new JPanel(); 
-		mainPanel.setLayout( new BoxLayout( mainPanel, BoxLayout.LINE_AXIS ) );
-		String localtitle = "Variance along X and Y";
-		mainChartFrame = GuiUtil.generateTitleFrame(localtitle, 
-				new JPanel(), new Dimension(1400, 800), true, true, true, true);	
-
-		int totalpoints = 0;
-		ArrayList<XYSeriesCollection> xyDataSetList = new ArrayList <XYSeriesCollection>();
-		XYSeriesCollection xyDataset = graphCreateXYDataSet(arrayX, "X chan ");
-		xyDataSetList.add(xyDataset);
-		totalpoints += xyDataset.getSeries(0).getItemCount();
-		xyDataset = graphCreateXYDataSet(arrayY, "Y chan ");
-		xyDataSetList.add(xyDataset);
-		totalpoints += xyDataset.getSeries(0).getItemCount();
-		
-		for (int i=0; i<xyDataSetList.size(); i++) {
-			xyDataset = xyDataSetList.get(i);
-			int npoints = xyDataset.getSeries(0).getItemCount();
-			JFreeChart xyChart = ChartFactory.createXYLineChart(null, null, null, xyDataset, PlotOrientation.VERTICAL, true, true, true);
-			xyChart.setAntiAlias( true );
-			xyChart.setTextAntiAlias( true );
-			int drawWidth =  npoints * 800 / totalpoints;
-			int drawHeight = 400;
-			ChartPanel xyChartPanel = new ChartPanel(xyChart, drawWidth, drawHeight, drawWidth, drawHeight, drawWidth, drawHeight, false, false, true, true, true, true);
-			mainPanel.add(xyChartPanel);
-		}
-
-		mainChartFrame.add(mainPanel);
-		mainChartFrame.pack();
-		Viewer v = virtualSequence.seq.getFirstViewer();
-		Rectangle rectv = v.getBounds();
-		Point pt = new Point((int) rectv.getX(), (int) rectv.getY()+30);
-		mainChartFrame.setLocation(pt);
-
-		mainChartFrame.setVisible(true);
-		mainChartFrame.addToDesktopPane ();
-		mainChartFrame.requestFocus();
-	}
-	
-	private List<List<Line2D>> buildLinesFromSTDProfile(Polygon roiPolygon, double [][] stdXArray, double [][] stdYArray, int threshold, int channel) 
-	{
-		//get points > threshold
-		List<Integer> listofX = getTransitions (stdXArray, threshold, channel);
-		List<Integer> listofY = getTransitions (stdYArray, threshold, channel);
-		
-		ArrayList<Line2D> vertlines = getVerticalLinesFromIntervals(roiPolygon, listofX);
-		ArrayList<Line2D> horzlines = getHorizontalLinesFromIntervals(roiPolygon, listofY);
-		
-		int averagewidth = (int) (roiPolygon.getBounds().getWidth() / (vertlines.size()-1));
-		int checksize = averagewidth / 3;
-		int deltainside = averagewidth / 8;
-		for (Line2D line: vertlines) {
-			line = adjustLine (line, checksize, deltainside);
-		}
-		
-		averagewidth = (int) (roiPolygon.getBounds().getHeight() / (horzlines.size()-1));
-		checksize = averagewidth / 3;
-		deltainside = averagewidth / 8;
-		for (Line2D line: horzlines) {
-			line = adjustLine (line, checksize, deltainside);
-		}
-
-		List<List<Line2D>> linesArray = new ArrayList<List<Line2D>> ();
-		linesArray.add(vertlines);
-		linesArray.add(horzlines);
-		
-		return linesArray;
-	}
-	
-	private int getIndexMinimumValue (double [][] profile) 
-	{
-		int n= profile.length;
-		int imin = 0;
-		double valuemin = profile[0][0] + profile[0][1] + profile[0][2];
-		for (int chan= 0; chan < 3; chan++) {
-			
-			for (int i=0; i< n; i++) {
-				double value = profile[i][0] + profile[i][1] + profile[i][2];
-				if (value < valuemin) {
-					valuemin = value; 
-					imin = i;
-				}
-			}
-		}
-		return imin;
-	}
-	
-	private Line2D adjustLine (Line2D line, int checksize, int deltainside) 
-	{	
-		Rectangle rect = line.getBounds();	
-		Line2D bestline = new Line2D.Double();
-		
-		// horizontal lines
-		if (rect.getWidth() >= rect.getHeight()) {
-			// check profile of a line perpendicular to this line at one end (linetest1) and then at the other end (linetest2)
-			Line2D linetest1 = new Line2D.Double (line.getX1()+deltainside, line.getY1()-checksize, line.getX1()+deltainside, line.getY2()+checksize);
-			int iy1min = getIndexMinimumValue(getProfile(linetest1))-checksize;
-			Line2D linetest2 = new Line2D.Double (line.getX2()-deltainside, line.getY2()-checksize, line.getX2()-deltainside, line.getY2()+checksize);
-			int iy2min = getIndexMinimumValue(getProfile(linetest2))-checksize;
-			bestline.setLine(line.getX1(), line.getY1()-iy1min, line.getX2(), line.getY2()-iy2min);
-		}
-		// vertical lines
-		else {
-			Line2D linetest1 = new Line2D.Double (line.getX1()-checksize, line.getY1()+deltainside, line.getX1()+checksize, line.getY2()+deltainside);
-			int iy1min = getIndexMinimumValue(getProfile(linetest1))-checksize;
-			Line2D linetest2 = new Line2D.Double (line.getX2()-checksize, line.getY2()-deltainside, line.getX2()+checksize, line.getY2()-deltainside);
-			int iy2min = getIndexMinimumValue(getProfile(linetest2))-checksize;
-			bestline.setLine(line.getX1(), line.getY1()-iy1min, line.getX2(), line.getY2()-iy2min);
-		}
-		return bestline;
-	}
-	
-	private ArrayList<Line2D> getVerticalLinesFromIntervals(Polygon roiPolygon, List<Integer> listofX) 
-	{
-		ArrayList<Line2D> verticallines = new ArrayList<Line2D>();
-		double deltaYTop = roiPolygon.ypoints[3] - roiPolygon.ypoints[0];
-		double deltaXTop = roiPolygon.xpoints[3] - roiPolygon.xpoints[0];
-		double deltaYBottom = roiPolygon.ypoints[2] - roiPolygon.ypoints[1];
-		double deltaXBottom = roiPolygon.xpoints[2] - roiPolygon.xpoints[1];
-		double lastX = listofX.get(listofX.size() -1);
-		
-		for (int i = 0; i < listofX.size(); i++) {
-			int index = listofX.get(i);
-			int ixtop = (int) (index*deltaXTop/lastX);
-			int ixbottom = (int) (index*deltaXBottom/lastX);
-			Point2D.Double top 		= new Point2D.Double(roiPolygon.xpoints[0] + ixtop, 	roiPolygon.ypoints[0] + index*deltaYTop/lastX);
-			Point2D.Double bottom 	= new Point2D.Double(roiPolygon.xpoints[1] + ixbottom,	roiPolygon.ypoints[1] + index*deltaYBottom/lastX);
-			Line2D line = new Line2D.Double (top, bottom);
-			verticallines.add(line);
-		}
-		return verticallines;
-	}
-	
-	private ArrayList<Line2D> getHorizontalLinesFromIntervals(Polygon roiPolygon, List<Integer> listofY) 
-	{
-		ArrayList<Line2D> horizontallines = new ArrayList<Line2D>();
-		double deltaYLeft = roiPolygon.ypoints[1] - roiPolygon.ypoints[0];
-		double deltaXLeft = roiPolygon.xpoints[1] - roiPolygon.xpoints[0];
-		double deltaYRight = roiPolygon.ypoints[2] - roiPolygon.ypoints[3];
-		double deltaXRight = roiPolygon.xpoints[2] - roiPolygon.xpoints[3];
-		double lastX = listofY.get(listofY.size() -1);
-		
-		for (int i = 0; i < listofY.size(); i++) {
-			int index = listofY.get(i);
-			int iyleft = (int) (index*deltaYLeft/lastX);
-			int iyright = (int) (index*deltaYRight/lastX);
-			Point2D.Double left = new Point2D.Double(roiPolygon.xpoints[0] + index*deltaXLeft/lastX, 	roiPolygon.ypoints[0] + iyleft); 
-			Point2D.Double right = new Point2D.Double(roiPolygon.xpoints[3] + index*deltaXRight/lastX,	roiPolygon.ypoints[3] + iyright); 
-			Line2D line = new Line2D.Double (left, right);
-			horizontallines.add(line);
-		}
-		return horizontallines;
-	}
-	
-	private List<Integer> getTransitions (double [][] arrayWithSTDvalues, int userSTDthreshold, int channel) 
-	{
-		List<Integer> listofpoints = new ArrayList<Integer> ();
-		listofpoints.add(0);
-		
-		// assume that we look at the first point over threshold starting from the border
-		boolean bDetectGetDown = true;
-		double duserSTDthreshold = userSTDthreshold;
-		double minSTDvalue = arrayWithSTDvalues[0][channel];
-		double previousSTDvalue = minSTDvalue;
-		int iofminSTDvalue = 0;
-		
-		for (int ix=1; ix < arrayWithSTDvalues.length; ix++) {
-			double value = arrayWithSTDvalues[ix][channel];
-			if (bDetectGetDown && ((previousSTDvalue>duserSTDthreshold) && (value < duserSTDthreshold))) {
-				bDetectGetDown = false;
-				iofminSTDvalue = ix;
-				minSTDvalue = value;
-			}
-			else if (!bDetectGetDown) {
-				if ((value > duserSTDthreshold) && (previousSTDvalue < duserSTDthreshold)) {
-					bDetectGetDown = true;
-					listofpoints.add(iofminSTDvalue);
-				}
-				else if (value < minSTDvalue) {
-					minSTDvalue = value;
-					iofminSTDvalue = ix;
-				}
-			}
-			previousSTDvalue = value;
-		}
-		iofminSTDvalue = arrayWithSTDvalues.length-1;
-		listofpoints.add(iofminSTDvalue);
-
-		return listofpoints;
-	}
-
-	private void buildROIsFromLines (List<List<Line2D>> linesArray) 
-	{
-		// build dummy lines
-		String [] type = new String [] {"vertical", "horizontal"};  
-		int itype = 0;
-		for (List<Line2D> firstarray : linesArray) {
-			int i=0;
-			for (Line2D line: firstarray) {
-				ROI2DLine roiL1 = new ROI2DLine (line);
-				roiL1.setName(type[itype]+i);
-				roiL1.setReadOnly(false);
-				roiL1.setColor(Color.RED);
-				ezSequence.getValue(true).addROI(roiL1, true);
-				i++;
-			}
-			itype++;
-		}
-	}
-	
-	private void buildAutoGrid () 
-	{
-		ROI2D roi = ezSequence.getValue(true).getSelectedROI2D();
-		if ( ! ( roi instanceof ROI2DPolygon ) ) {
-			new AnnounceFrame("The frame must be a ROI 2D POLYGON");
-			return;
-		}
-		Polygon roiPolygon = FmpTools.orderVerticesofPolygon (((ROI2DPolygon) roi).getPolygon());
-		ezSequence.getValue(true).removeAllROI();
-		ezSequence.getValue(true).addROI(roi, true);
-		int channel = 0;
-		String choice = thresholdSTDFromChanComboBox.getValue();
-		if (choice.contains("R+B-2G"))
-			channel = 3;
-		else if (choice.contains("R"))
-			channel = 0;
-		else if (choice.contains("G"))
-			channel = 1;
-		else
-			channel = 2;
-		//buildROIsFromSTDProfile( roiPolygon, thresholdSTD.getValue(), channel);
-		List<List<Line2D>> linesArray = buildLinesFromSTDProfile( roiPolygon, stdXArray, stdYArray, thresholdSTD.getValue(), channel);
-		
-		buildROIsFromLines(linesArray);
-		//expandROIsToMinima(0);
-	}
-	
-	private void convertLinesToSquares() 
-	{
-		ArrayList<ROI2D> list = ezSequence.getValue(true).getROI2Ds();
-//		Collections.sort(list, new Tools.ROI2DNameComparator());
-		List <ROI2DLine> vertRoiLines = new ArrayList <ROI2DLine> ();
-		List <ROI2DLine> horizRoiLines = new ArrayList <ROI2DLine> ();
-		for (ROI2D roi: list) {
-			String name = roi.getName();
-			if (name.contains("vertical"))
-				vertRoiLines.add((ROI2DLine)roi);
-			else if (name.contains("horizontal"))
-				horizRoiLines.add((ROI2DLine) roi);
-		}
-		Collections.sort(vertRoiLines, new FmpTools.ROI2DLineLeftXComparator());
-		Collections.sort(horizRoiLines, new FmpTools.ROI2DLineLeftYComparator());
-		ezSequence.getValue(true).removeAllROI();
-		
-		ROI2DLine roih1 = null;
-		int row = 0;
-		int areaShrinkPCT = areaShrink.getValue();
-		for (ROI2DLine roih2: horizRoiLines) {
-			if (roih1 == null) {
-				roih1 = roih2;
-				continue;
-			}
-			ROI2DLine roiv1 = null;
-			int col = 0;
-			for (ROI2DLine roiv2: vertRoiLines) {
-				if (roiv1 == null) {
-					roiv1 = roiv2;
-					continue;
-				}
-				List <Point2D> listpoints = new ArrayList<Point2D> ();
-				listpoints.add(GeomUtil.getIntersection(roiv1.getLine(), roih1.getLine()));
-				listpoints.add(GeomUtil.getIntersection(roiv1.getLine(), roih2.getLine()));
-				listpoints.add(GeomUtil.getIntersection(roiv2.getLine(), roih2.getLine()));
-				listpoints.add(GeomUtil.getIntersection(roiv2.getLine(), roih1.getLine()));
-				
-				areaShrink (listpoints, areaShrinkPCT);
-				addPolygonROI (listpoints, ezRootnameComboBox.getValue(), col, row);
-				
-				roiv1 = roiv2;
-				col++;
-			}
-			roih1 = roih2;
-			row++;
-		}
-	}
-	
-	private void areaShrink(List <Point2D> listpoints, int areaShrinkPCT) {
-	// assume 4 ordered points 0 (topleft), 1 (bottomleft), 2 (bottomright), 3 (topright)
-		double xdeltatop = (listpoints.get(3).getX()-listpoints.get(0).getX() +1)*areaShrinkPCT/200 ;
-		double xdeltabottom = (listpoints.get(2).getX()-listpoints.get(1).getX() +1)*areaShrinkPCT/200;
-		double ydeltaleft = (listpoints.get(1).getY()-listpoints.get(0).getY() +1)*areaShrinkPCT/200;
-		double ydeltaright = (listpoints.get(2).getY()-listpoints.get(3).getY() +1)*areaShrinkPCT/200;
-		int i=0;
-		listpoints.get(i).setLocation(listpoints.get(i).getX() + xdeltatop, listpoints.get(i).getY() + ydeltaleft); 	
-		i=1;
-		listpoints.get(i).setLocation(listpoints.get(i).getX() + xdeltabottom, listpoints.get(i).getY()-ydeltaleft);
-		i=2;
-		listpoints.get(i).setLocation(listpoints.get(i).getX() - xdeltabottom, listpoints.get(i).getY() - ydeltaright);
-		i=3;
-		listpoints.get(i).setLocation(listpoints.get(i).getX() - xdeltatop, listpoints.get(i).getY() + ydeltaright);
-	}	
 	
 // -----------------------------------	
 	
@@ -997,136 +480,6 @@ public class RoiToRoiArray extends EzPlug implements ViewerListener
 	
 	// ----------------------------------
 	
-	private void addEllipseROI (List<Point2D> points, String baseName, int i, int j) 
-	{
-		ROI2DEllipse roiP = new ROI2DEllipse (points.get(0), points.get(2));
-		roiP.setName(baseName+ String.format("_r%02d", j) + String.format("_c%02d", i));
-		roiP.setColor(Color.YELLOW);
-		ezSequence.getValue(true).addROI(roiP);
-	}
-	
-	private void addPolygonROI (List<Point2D> points, String baseName, int columnnumber, int rownumber) 
-	{
-		ROI2DPolygon roiP = new ROI2DPolygon (points);
-		roiP.setName(baseName+ String.format("_R%02d", rownumber) + String.format("_C%02d", columnnumber));
-		roiP.setColor(Color.YELLOW);
-		ezSequence.getValue(true).addROI(roiP);
-	}
-	
-	private void addLineROI (List<Point2D> points, String baseName, int i, int j) 
-	{
-		ROI2DLine roiL1 = new ROI2DLine (points.get(0), points.get(1));
-		roiL1.setName(baseName+ String.format("%02d", i/2)+"L");
-		roiL1.setReadOnly(false);
-		roiL1.setColor(Color.YELLOW);
-		ezSequence.getValue(true).addROI(roiL1, true);
-		
-		ROI2DLine roiL2 = new ROI2DLine (points.get(2), points.get(3));
-		roiL2.setName(baseName+ String.format("%02d", i/2)+"R");
-		roiL2.setReadOnly(false);
-		roiL2.setColor(Color.YELLOW);
-		ezSequence.getValue(true).addROI(roiL2, true);
-	}
-	
-	private void createROISFromSelectedPolygon(int ioption) 
-	{
-		ROI2D roi = ezSequence.getValue(true).getSelectedROI2D();
-		if ( ! ( roi instanceof ROI2DPolygon ) ) {
-			new AnnounceFrame("Select a 2D ROI polygon");
-			return;
-		}
-
-		Polygon roiPolygon = FmpTools.orderVerticesofPolygon (((ROI2DPolygon) roi).getPolygon());
-		ezSequence.getValue(true).removeAllROI();
-		ezSequence.getValue(true).addROI(roi, true);
-		
-		double colSpan = columnSpan.getValue();
-		double colSize = columnSize.getValue();
-		double nbcols = ezNumberOfColumns.getValue(); 
-		double colsSum = nbcols * (colSize + colSpan) + colSpan;
-		
-		double rowSpan = rowInterval.getValue();
-		double rowSize = rowWidth.getValue();
-		double nbrows = ezNumberOfRows.getValue();
-		double rowsSum = nbrows * (rowSize + rowSpan) + rowSpan;
-
-		String baseName = null;
-
-		for (int column=0; column< nbcols; column++) {
-			
-			double ratioX0 = ((colSize + colSpan)*column + colSpan) /colsSum;
-			
-			double x = roiPolygon.xpoints[0] + (roiPolygon.xpoints[3]-roiPolygon.xpoints[0]) * ratioX0;
-			double y = roiPolygon.ypoints[0] + (roiPolygon.ypoints[3]-roiPolygon.ypoints[0]) * ratioX0;
-			Point2D.Double ipoint0 = new Point2D.Double (x, y);
-			
-			x = roiPolygon.xpoints[1] + (roiPolygon.xpoints[2]-roiPolygon.xpoints[1]) * ratioX0 ;
-			y = roiPolygon.ypoints[1] + (roiPolygon.ypoints[2]-roiPolygon.ypoints[1]) * ratioX0 ;
-			Point2D.Double ipoint1 = new Point2D.Double (x, y);
-
-			double ratioX1 = ((colSize + colSpan)*(column+1)) / colsSum;
-
-			x = roiPolygon.xpoints[1]+ (roiPolygon.xpoints[2]-roiPolygon.xpoints[1]) * ratioX1;
-			y = roiPolygon.ypoints[1]+ (roiPolygon.ypoints[2]-roiPolygon.ypoints[1]) * ratioX1;
-			Point2D.Double ipoint2 = new Point2D.Double (x, y);
-			
-			x = roiPolygon.xpoints[0]+ (roiPolygon.xpoints[3]-roiPolygon.xpoints[0]) * ratioX1;
-			y = roiPolygon.ypoints[0]+ (roiPolygon.ypoints[3]-roiPolygon.ypoints[0]) * ratioX1;
-			Point2D.Double ipoint3 = new Point2D.Double (x, y);
-			
-			for (int row=0; row < ezNumberOfRows.getValue(); row++) {
-				
-				double ratioY0 = ( (rowSize + rowSpan)*row + rowSpan)/rowsSum;
-
-				x = ipoint0.x + (ipoint1.x - ipoint0.x) * ratioY0;
-				y = ipoint0.y + (ipoint1.y - ipoint0.y) * ratioY0;
-				Point2D.Double point0 = new Point2D.Double (x, y);
-				
-				x = ipoint3.x + (ipoint2.x - ipoint3.x) * ratioY0;
-				y = ipoint3.y + (ipoint2.y - ipoint3.y) * ratioY0;
-				Point2D.Double point3 = new Point2D.Double (x, y);
-				
-				double ratioY1 = ( (rowSize + rowSpan)*(row+1)) / rowsSum;
-				x = ipoint0.x + (ipoint1.x - ipoint0.x) * ratioY1;
-				y = ipoint0.y + (ipoint1.y - ipoint0.y) * ratioY1;
-				Point2D.Double point1 = new Point2D.Double (x, y);
-				
-				x = ipoint3.x + (ipoint2.x - ipoint3.x) * ratioY1;
-				y = ipoint3.y + (ipoint2.y - ipoint3.y) * ratioY1;
-				Point2D.Double point2 = new Point2D.Double (x, y);
-				
-				List<Point2D> points = new ArrayList<>();
-				points.add(point0);
-				points.add(point1);
-				points.add(point2);
-				points.add(point3);
-				
-				switch (ioption)
-				{
-				case 0:
-					if (baseName == null)
-						baseName = ezRootnameComboBox.getValue()+"_line ";
-					addLineROI (points, baseName, column, row);
-					break;
-				case 1:
-					if (baseName == null)
-						baseName = ezRootnameComboBox.getValue()+"_area ";
-					addPolygonROI (points, baseName, column, row);
-					break;
-				case 2:
-				default:
-					if (baseName == null)
-						baseName = ezRootnameComboBox.getValue()+"_circle ";
-					addEllipseROI (points, baseName, column, row);
-					break;
-				}
-			}
-		}
-
-		ArrayList<ROI2D> list = ezSequence.getValue(true).getROI2Ds();
-		Collections.sort(list, new FmpTools.ROI2DNameComparator());
-	}
-	
 	@Override
 	public void clean() 
 	{
@@ -1138,17 +491,26 @@ public class RoiToRoiArray extends EzPlug implements ViewerListener
 	protected void execute() 
 	{
 		String choice = splitAsComboBox.getValue();
+		Sequence seq = ezSequence.getValue();
+		double colSpan = columnSpan.getValue();
+		double colSize = columnSize.getValue();
+		double nbcols = ezNumberOfColumns.getValue(); 
+		double rowSpan = rowInterval.getValue();
+		double rowSize = rowWidth.getValue();
+		double nbrows = ezNumberOfRows.getValue();
+		String rootName = ezRootnameComboBox.getValue();
+		
 		if (choice == "vertical lines") 
 		{
-			createROISFromSelectedPolygon(0);
+			BuildROIsFromLines.createROISFromSelectedPolygon(seq, 0, rootName, colSpan, colSize, nbcols, rowSpan, rowSize, nbrows);
 		}
 		else if (choice == "polygons") 
 		{
-			createROISFromSelectedPolygon(1);
+			BuildROIsFromLines.createROISFromSelectedPolygon(seq, 1, rootName, colSpan, colSize, nbcols, rowSpan, rowSize, nbrows);
 		}
 		else if (choice == "circles") 
 		{
-			createROISFromSelectedPolygon(2);
+			BuildROIsFromLines.createROISFromSelectedPolygon(seq, 2, rootName, colSpan, colSize, nbcols, rowSpan, rowSize, nbrows);
 		}		
 	}
 	
