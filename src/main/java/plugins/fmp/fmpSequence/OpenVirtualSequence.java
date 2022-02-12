@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 
+
 import icy.file.Loader;
 import icy.file.SequenceFileImporter;
 import icy.gui.dialog.LoaderDialog;
@@ -12,9 +13,11 @@ import icy.gui.dialog.MessageDialog;
 import icy.gui.viewer.Viewer;
 import icy.main.Icy;
 import icy.sequence.Sequence;
-import ome.xml.meta.OMEXMLMetadata;
+
 import plugins.fmp.fmpTools.StringSorter;
 import plugins.stef.importer.xuggler.VideoImporter;
+
+
 
 public class OpenVirtualSequence {
 	
@@ -120,8 +123,8 @@ public class OpenVirtualSequence {
 			importer = new VideoImporter();
 			statusSequence = EnumStatus.AVIFILE;
 			importer.open( fileName, 0 );
-			OMEXMLMetadata metaData = importer.getOMEXMLMetaData();
-			//nTotalFrames = MetaDataUtil.getSizeT( metaData, 0 ) - 2 ; 
+//			OMEXMLMetadata metaData = importer.getOMEXMLMetaData();
+//			nTotalFrames = MetaDataUtil.getSizeT( metaData, 0 ) - 2 ; 
 			// get one frame less as there is a little bug in the decompression of the video in h264
 		}
 		catch (Exception exc)

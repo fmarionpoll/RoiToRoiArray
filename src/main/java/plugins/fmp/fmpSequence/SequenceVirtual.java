@@ -20,7 +20,6 @@ import icy.type.collection.array.Array1DUtil;
 
 import plugins.fmp.fmpTools.EnumImageOp;
 import plugins.fmp.fmpTools.ImageOperationsStruct;
-import plugins.stef.importer.xuggler.VideoImporter;
 
 
 
@@ -28,7 +27,6 @@ import plugins.stef.importer.xuggler.VideoImporter;
 public class SequenceVirtual 
 {
 	public Sequence			seq				= null;
-	protected VideoImporter importer 		= null;
 	private List <String> 	imagesList 		= null;
 	private String 			csFileName 		= null;
 	private String			directory 		= null;

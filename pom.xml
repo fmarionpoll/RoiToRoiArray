@@ -88,11 +88,6 @@
         </dependency>
         <dependency>
         	<groupId>org.bioimageanalysis.icy</groupId>
-        	<artifactId>xuggler</artifactId>
-        	<version>5.5.2</version>
-        </dependency>
-        <dependency>
-        	<groupId>org.bioimageanalysis.icy</groupId>
         	<artifactId>video-importer</artifactId>
         	<version>1.1.3</version>
         </dependency>
