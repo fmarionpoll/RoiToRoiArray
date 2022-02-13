@@ -37,7 +37,7 @@ public class OpenVirtualSequence {
 		filename = directory + ".xml";
 	}
 	*/
-	public static SequenceVirtual initVirtualSequence(Sequence seq) 
+	public static Viewer initSequenceViewer(Sequence seq) 
 	{
 		if (seq == null)
 			return null;
@@ -46,8 +46,8 @@ public class OpenVirtualSequence {
 		if (v != null) 
 			v.close();
 		Icy.getMainInterface().addSequence(seq);
-		
-		return new SequenceVirtual(seq);
+		v = seq.getFirstViewer();
+		return v;
 	}
 	
 	public static Sequence openImagesOrAvi(String path) 

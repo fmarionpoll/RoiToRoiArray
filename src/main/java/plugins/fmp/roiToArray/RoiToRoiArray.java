@@ -91,8 +91,9 @@ public class RoiToRoiArray extends EzPlug implements ViewerListener, FoldListene
 				}});
 		ezFindLinesButton = new EzButton("Build histograms",  new ActionListener() { 
 			public void actionPerformed(ActionEvent e) { 
-				sequenceVirtual = OpenVirtualSequence.initVirtualSequence(ezSequence.getValue());
 				Sequence seq = ezSequence.getValue();
+				OpenVirtualSequence.initSequenceViewer(seq);
+				sequenceVirtual = new SequenceVirtual(seq);
 				DetectLinesSTD.findLines(seq, sequenceVirtual.currentFrame); 
 				}});
 		ezOpenFileButton = new EzButton("Open file or sequence",  new ActionListener() { 
@@ -192,7 +193,8 @@ public class RoiToRoiArray extends EzPlug implements ViewerListener, FoldListene
 			sequenceVirtual.close();
 		
 		Sequence seq = OpenVirtualSequence.openImagesOrAvi(null);
-		sequenceVirtual = OpenVirtualSequence.initVirtualSequence(seq);
+		OpenVirtualSequence.initSequenceViewer(seq);
+		sequenceVirtual = new SequenceVirtual(seq);
 		String path = sequenceVirtual.getDirectory();
 		if (path != null) 
 		{
@@ -200,11 +202,15 @@ public class RoiToRoiArray extends EzPlug implements ViewerListener, FoldListene
 			guiPrefs.put("lastUsedPath", path);
 		}
 		addSequenceToEzSequenceCombo(seq);
+		listenToSequenceViewer (seq);
 	}
 	
 	private void addSequenceToEzSequenceCombo (Sequence seq) 
 	{
 		ezSequence.setValue(seq);
+	}
+	
+	private void listenToSequenceViewer (Sequence seq) {
 		Viewer v = seq.getFirstViewer();
 		v.addListener(RoiToRoiArray.this);
 	}
