@@ -130,12 +130,6 @@ public class RoiToRoiArray extends EzPlug implements ViewerListener, FoldListene
 			public void actionPerformed(ActionEvent e) { 
 				changeGridName(); 
 				}});
-//		overlayCheckBox = new EzVarBoolean("build from overlay", false);
-//		overlayCheckBox.addVarChangeListener(new EzVarListener<Boolean>() {
-//             @Override
-//             public void variableChanged(EzVar<Boolean> source, Boolean newValue) {
-//            	 DetectLeafDisks.displayOverlay(sequenceVirtual, newValue, thresholdOv);
-//             }});
 
 		filterComboBox = new EzVarEnum <EnumImageOp>("Filter as ", EnumImageOp.values(), 7);
 		filterComboBox.addVarChangeListener(new EzVarListener<EnumImageOp>() {
@@ -221,7 +215,6 @@ public class RoiToRoiArray extends EzPlug implements ViewerListener, FoldListene
 	public void clean() 
 	{
 		// TODO Auto-generated method stub
-		
 	}
 	
 	@Override
