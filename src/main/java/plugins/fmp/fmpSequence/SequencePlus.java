@@ -19,8 +19,6 @@ import org.w3c.dom.Node;
 
 import icy.image.IcyBufferedImage;
 import icy.roi.ROI2D;
-import icy.roi.ROIEvent;
-import icy.sequence.SequenceEvent.SequenceEventType;
 import icy.type.geom.Polyline2D;
 import icy.util.XMLUtil;
 import plugins.fmp.fmpTools.FmpTools;
