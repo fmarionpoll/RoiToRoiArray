@@ -20,16 +20,13 @@ import plugins.adufour.ezplug.EzButton;
 import plugins.adufour.ezplug.EzGroup;
 import plugins.adufour.ezplug.EzGroup.FoldListener;
 import plugins.adufour.ezplug.EzPlug;
-import plugins.adufour.ezplug.EzVar;
-import plugins.adufour.ezplug.EzVarEnum;
 import plugins.adufour.ezplug.EzVarInteger;
-import plugins.adufour.ezplug.EzVarListener;
 import plugins.adufour.ezplug.EzVarSequence;
 import plugins.adufour.ezplug.EzVarText;
 
 import plugins.fmp.fmpSequence.OpenVirtualSequence;
 import plugins.fmp.fmpSequence.SequenceVirtual;
-import plugins.fmp.fmpTools.EnumImageOp;
+
 
 
 
@@ -47,9 +44,7 @@ public class RoiToRoiArray extends EzPlug implements ViewerListener, FoldListene
 	EzVarInteger 	rowInterval; 
 	EzVarText 		splitAsComboBox;
 	EzVarText 		thresholdSTDFromChanComboBox;
-	EzButton		adjustAndCenterEllipsesButton;
-	EzVarEnum<EnumImageOp> filterComboBox;
-	EzVarInteger 	thresholdOv;
+
 	EzVarInteger 	thresholdSTD;
 	EzButton		openXMLButton;
 	EzButton		saveXMLButton;
@@ -61,10 +56,9 @@ public class RoiToRoiArray extends EzPlug implements ViewerListener, FoldListene
 	
 	EzGroup groupDetectFromSTD;
 	EzGroup groupDefineManually;
-	EzGroup groupDetectDisks;
 	
 	private SequenceVirtual sequenceVirtual = null;
-	private boolean [] foldingStatus = new boolean[3];
+	private boolean [] foldingStatus = new boolean[2];
 	
 	// ----------------------------------
 	
@@ -85,10 +79,7 @@ public class RoiToRoiArray extends EzPlug implements ViewerListener, FoldListene
 		rowInterval 		= new EzVarInteger("space btw. row ", 0, 0, 1000, 1);
 		areaShrink			= new EzVarInteger("area shrink (%)", 5, -100, 100, 1);
 		
-		adjustAndCenterEllipsesButton = new EzButton("Find leaf disks within ROIs", new ActionListener() { 
-			public void actionPerformed(ActionEvent e) { 
-				DetectLeafDisks.findLeafDiskIntoRectangles(sequenceVirtual); 
-				}});
+
 		ezFindLinesButton = new EzButton("Build histograms",  new ActionListener() { 
 			public void actionPerformed(ActionEvent e) { 
 				Sequence seq = ezSequence.getValue();
@@ -131,21 +122,7 @@ public class RoiToRoiArray extends EzPlug implements ViewerListener, FoldListene
 				changeGridName(); 
 				}});
 
-		filterComboBox = new EzVarEnum <EnumImageOp>("Filter as ", EnumImageOp.values(), 7);
-		filterComboBox.addVarChangeListener(new EzVarListener<EnumImageOp>() {
-			@Override
-			public void variableChanged(EzVar<EnumImageOp> source, EnumImageOp newOp) {
-				EnumImageOp transformop = filterComboBox.getValue();
-				DetectLeafDisks.updateOverlay(sequenceVirtual, transformop);
-				}});
-		
-		thresholdOv = new EzVarInteger("threshold ", 70, 1, 255, 1);
 		thresholdSTD = new EzVarInteger("threshold / selected filter", 500, 1, 10000, 1);
-		thresholdOv.addVarChangeListener(new EzVarListener<Integer>() {
-            @Override
-            public void variableChanged(EzVar<Integer> source, Integer newValue) { 
-            	DetectLeafDisks.updateThreshold(sequenceVirtual, newValue); 
-            	}});
 
 		// 2) add variables to the interface
 
@@ -167,13 +144,6 @@ public class RoiToRoiArray extends EzPlug implements ViewerListener, FoldListene
 		foldingStatus[1] = true;
 		groupDefineManually.setFoldedState(foldingStatus[1]);
 		groupDefineManually.addFoldListener(this);
-
-		groupDetectDisks = new EzGroup("Detect leaf disks", 
-				filterComboBox, thresholdOv, adjustAndCenterEllipsesButton);
-		super.addEzComponent (groupDetectDisks);
-		foldingStatus[2] = true;
-		groupDetectDisks.setFoldedState(foldingStatus[2]);
-		groupDetectDisks.addFoldListener(this);
 		
 		EzGroup outputParameters = new EzGroup("Output data",  ezRootnameComboBox, changeGridNameButton, saveXMLButton);
 		super.addEzComponent (outputParameters);
@@ -296,13 +266,9 @@ public class RoiToRoiArray extends EzPlug implements ViewerListener, FoldListene
 		boolean [] status = new boolean [3];
 		status[0] = groupDetectFromSTD.getFoldedState();
 		status[1] = groupDefineManually.getFoldedState();
-		status[2] = groupDetectDisks.getFoldedState();
 		
 		makeSureOnlyOneGroupIsUnfolded(status, foldingStatus);
 		foldGroups (status);
-		
-		int threshold = thresholdOv.getValue();
-		DetectLeafDisks.displayOverlay(sequenceVirtual, !foldingStatus[2], threshold);
 	}
 	
 	private void foldGroups(boolean [] status) {
@@ -312,11 +278,10 @@ public class RoiToRoiArray extends EzPlug implements ViewerListener, FoldListene
 		
 		groupDetectFromSTD.setFoldedState(status[0]);
 		groupDefineManually.setFoldedState(status[1]);
-		groupDetectDisks.setFoldedState(status[2]);
 	}
 	
 	private void makeSureOnlyOneGroupIsUnfolded(boolean [] statusNew, boolean [] statusOld) {
-		int size = 3;
+		int size = foldingStatus.length;
 		for (int i= 0; i < size; i++) {
 			if (!statusNew[i] && statusNew[i] != statusOld[i]) {
 				for (int j = 0; j < size; j++ ) {
